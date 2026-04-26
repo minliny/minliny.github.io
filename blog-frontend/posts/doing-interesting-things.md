@@ -6,6 +6,7 @@ group: notes
 tags:
   - thinking
   - writing
+notionId: 34e9c346-4cea-81e0-b68b-f33ca7d96b64
 ---
 
 我一直在思考"有意思"这个词。

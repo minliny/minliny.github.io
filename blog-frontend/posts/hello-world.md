@@ -6,6 +6,7 @@ group: notes
 tags:
   - writing
   - blog
+notionId: 34e9c346-4cea-8196-acb8-e9450720003f
 ---
 
 这是第一篇文章。
