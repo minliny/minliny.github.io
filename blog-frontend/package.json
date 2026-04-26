@@ -1,0 +1,19 @@
+{
+  "name": "blog-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static blog frontend with Notion publishing sync",
+  "scripts": {
+    "sync:notion": "node scripts/sync-notion.js",
+    "sync:notion:dry": "node scripts/sync-notion.js --dry-run",
+    "generate:posts": "node scripts/generate-posts.js",
+    "generate:rss": "node scripts/generate-rss.js",
+    "build": "node scripts/build.js",
+    "serve": "python3 -m http.server 4321"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "dotenv": "^16.4.5",
+    "gray-matter": "^4.0.3"
+  }
+}
