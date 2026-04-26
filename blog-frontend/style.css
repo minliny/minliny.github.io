@@ -1,0 +1,1198 @@
+/* ========================================
+   Design Tokens
+   4 主题：日间墨竹 / 夜间墨竹 / 日间普通 / 夜间普通
+======================================== */
+
+:root {
+  /* Day 日间色调（默认） */
+  --bg: #f5f0eb;
+  --text: #292524;
+  --mid: #78716c;
+  --line: #d6d3d1;
+  --accent: #c2410c;
+  --surface: #ede9e3;
+  --surface-strong: rgba(245, 240, 235, 0.92);
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-slow: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* body.day: 日间墨竹 — 与 :root 同色，仅作 CSS 选择器钩子 */
+
+/* 夜间：墨竹 + 普通共用同一套暗色令牌 */
+body.night,
+body.night-pure {
+  --bg: #0a0a0a;
+  --text: #d0cac4;
+  --mid: #a39b93;
+  --line: #2a2623;
+  --accent: #ea580c;
+  --surface: #141210;
+  --surface-strong: rgba(20, 18, 16, 0.9);
+}
+
+/* body.day-pure: 日间普通 — 与 :root 同色，无覆盖层 */
+
+/* ========================================
+   Reset & Base
+======================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Noto Serif SC", "Noto Sans SC", Georgia, serif;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.8;
+  transition: background 600ms var(--ease), color 600ms var(--ease);
+  min-height: 100vh;
+  position: relative;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ========================================
+   Noise Texture Overlay (SVG fractalNoise)
+======================================== */
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  background-repeat: repeat;
+}
+
+body.night::after,
+body.night-pure::after {
+  opacity: 0.025;
+}
+
+/* ========================================
+   Ink Bamboo Overlay
+   日间墨竹 / 夜间墨竹共用一份 SVG
+======================================== */
+
+#leaves-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  overflow: visible;
+  mix-blend-mode: multiply;
+  transform: translate3d(0, 0, 0) scale(var(--overlay-scale, 1.05));
+  transform-origin: 100% 0%;
+  will-change: opacity, filter;
+  backface-visibility: hidden;
+  contain: paint;
+  transition: opacity 1200ms var(--ease), filter 600ms var(--ease);
+}
+
+/* 日间墨竹：multiply — 深墨叠于淡纸 */
+body.day #leaves-overlay {
+  opacity: 0.82;
+  mix-blend-mode: multiply;
+  filter: none;
+}
+
+/* 夜间墨竹：screen + invert — 浅墨浮于暗底；hue-rotate 保留暖调 */
+body.night #leaves-overlay {
+  opacity: 0.58;
+  mix-blend-mode: screen;
+  filter: invert(1) hue-rotate(180deg) sepia(0.12) saturate(0.72) brightness(0.82);
+}
+
+/* 夜间各枝透明度调高（screen 模式比 multiply 显色弱） */
+body.night .bamboo-far      { opacity: 0.32; }
+body.night .bamboo-branch-a { opacity: 0.52; }
+body.night .bamboo-branch-b { opacity: 0.46; }
+body.night .bamboo-branch-c { opacity: 0.42; }
+body.night .bamboo-branch-d { opacity: 0.65; }
+body.night .bamboo-branch-e { opacity: 0.58; }
+
+/* 竹枝分组基础透明度 & 动画 */
+.bamboo-far {
+  opacity: 0.22;
+  animation: bambooFar 34s ease-in-out infinite;
+  will-change: transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.bamboo-mid,
+.bamboo-near {
+  opacity: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.bamboo-branch-a {
+  opacity: 0.34;
+  animation: bambooMid 22s ease-in-out infinite;
+  animation-delay: -4s;
+  will-change: transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bamboo-branch-b {
+  opacity: 0.30;
+  animation: bambooMid 27s ease-in-out infinite;
+  animation-delay: -14s;
+  will-change: transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bamboo-branch-c {
+  opacity: 0.28;
+  animation: bambooMid 19s ease-in-out infinite;
+  animation-delay: -8s;
+  will-change: transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bamboo-branch-d {
+  opacity: 0.46;
+  animation: bambooNear 15s ease-in-out infinite;
+  animation-delay: -5s;
+  will-change: transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bamboo-branch-e {
+  opacity: 0.40;
+  animation: bambooNear 18s ease-in-out infinite;
+  animation-delay: -11s;
+  will-change: transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes bambooFar {
+  0%, 100% { transform: translate(0, 0); }
+  35%      { transform: translate(8px, 6px); }
+  70%      { transform: translate(-5px, 12px); }
+}
+@keyframes bambooMid {
+  0%, 100% { transform: translate(0, 0); }
+  38%      { transform: translate(9px, 5px); }
+  68%      { transform: translate(-4px, 10px); }
+}
+@keyframes bambooNear {
+  0%, 100% { transform: translate(0, 0); }
+  42%      { transform: translate(7px, -3px); }
+  76%      { transform: translate(-4px, 7px); }
+}
+
+/* =============================================
+   竹叶覆盖层自适应 — 5 断点完整策略
+
+   原则：屏幕越小 → 越淡、越少；SVG 缩放收缩使竹子
+         自然退向右上角，不再往内容区域平移。
+   ============================================= */
+
+/* ── 宽屏（≥1440px）：稍微加强，有充足留白 ── */
+@media (min-width: 1440px) {
+  #leaves-overlay { --overlay-scale: 1.06; }
+  body.day #leaves-overlay   { opacity: 0.88; }
+  body.night #leaves-overlay { opacity: 0.62; }
+}
+
+/* ── 普通桌面（1024~1279px）：轻微缩放 ── */
+@media (max-width: 1279px) {
+  body.day #leaves-overlay,
+  body.night #leaves-overlay {
+    --overlay-scale: 1.01;
+  }
+}
+
+/* ── 平板（768~1023px）：减淡、缩小，远景淡出 ── */
+@media (max-width: 1023px) {
+  body.day #leaves-overlay   { opacity: 0.46; }
+  body.night #leaves-overlay { opacity: 0.34; }
+  body.day #leaves-overlay,
+  body.night #leaves-overlay {
+    --overlay-scale: 0.96;
+  }
+  .bamboo-far { opacity: 0.10; }
+}
+
+/* ── 手机（<768px）：大幅弱化，远景隐藏 ── */
+@media (max-width: 767px) {
+  body.day #leaves-overlay   { opacity: 0.20; }
+  body.night #leaves-overlay { opacity: 0.15; }
+  body.day #leaves-overlay,
+  body.night #leaves-overlay {
+    --overlay-scale: 0.90;
+  }
+  .bamboo-far      { display: none; }
+  .bamboo-branch-c { opacity: 0.10 !important; }
+}
+
+/* ── 小屏手机（<480px）：极淡，仅右上角残影 ── */
+@media (max-width: 479px) {
+  body.day #leaves-overlay   { opacity: 0.11; }
+  body.night #leaves-overlay { opacity: 0.08; }
+  body.day #leaves-overlay,
+  body.night #leaves-overlay {
+    --overlay-scale: 0.84;
+  }
+  .bamboo-branch-b,
+  .bamboo-branch-c { display: none; }
+}
+
+/* 降级：偏好减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  #leaves-overlay,
+  .bamboo-far, .bamboo-branch-a, .bamboo-branch-b,
+  .bamboo-branch-c, .bamboo-branch-d, .bamboo-branch-e {
+    animation: none !important;
+  }
+  body.day #leaves-overlay,
+  body.night #leaves-overlay {
+    --overlay-scale: 1.02;
+  }
+}
+
+/* 高 DPI：SVG 矢量自然锐利 */
+@media (min-resolution: 2dppx) {
+  #leaves-overlay { shape-rendering: geometricPrecision; }
+}
+
+/* ========================================
+   Layout — 版心 760px
+======================================== */
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 40px 80px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ========================================
+   Logo / 站点标题
+======================================== */
+
+.logo {
+  display: inline-block;
+  margin: 8px 0 16px;
+  text-decoration: none;
+}
+
+.logo-letter {
+  font-size: 80px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text);
+  display: block;
+  line-height: 1;
+  transition: color 200ms var(--ease), transform 200ms var(--ease);
+}
+
+.logo:hover .logo-letter {
+  color: var(--accent);
+  transform: translateY(-4px);
+}
+
+.logo-hint {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--mid);
+  text-transform: uppercase;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+
+.logo:hover .logo-hint {
+  opacity: 1;
+}
+
+/* ========================================
+   Bio / Tagline
+======================================== */
+
+.bio {
+  font-size: 18px;
+  line-height: 2;
+  color: var(--mid);
+  margin-bottom: 32px;
+}
+
+/* ========================================
+   Divider
+======================================== */
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 30px 0 34px;
+  transition: border-color 600ms var(--ease);
+}
+
+/* ========================================
+   Entry Cards — 文章列表
+======================================== */
+
+.entries {
+  list-style: none;
+}
+
+.grouped-entries {
+  display: grid;
+  gap: 34px;
+}
+
+.post-group {
+  display: block;
+}
+
+.group-title {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mid);
+  margin-bottom: 12px;
+}
+
+.group-list {
+  list-style: none;
+}
+
+.entry {
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+  opacity: 0;
+  transform: translateY(10px);
+  animation: entryFadeIn 800ms var(--ease-slow) forwards;
+  transition: border-color 600ms var(--ease);
+}
+
+@keyframes entryFadeIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.entry:nth-child(1) { animation-delay: 0ms; }
+.entry:nth-child(2) { animation-delay: 80ms; }
+.entry:nth-child(3) { animation-delay: 160ms; }
+.entry:nth-child(4) { animation-delay: 240ms; }
+.entry:nth-child(5) { animation-delay: 320ms; }
+.entry:nth-child(6) { animation-delay: 400ms; }
+.entry:nth-child(7) { animation-delay: 480ms; }
+.entry:nth-child(8) { animation-delay: 560ms; }
+
+.entry-title {
+  font-size: 31px;
+  font-weight: 600;
+  line-height: 1.42;
+  margin-bottom: 8px;
+}
+
+.entry-title a {
+  color: var(--text);
+  text-decoration: none;
+  transition: color 200ms var(--ease);
+}
+
+.entry-title a:hover {
+  color: var(--accent);
+}
+
+.entry-meta {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--mid);
+  margin-bottom: 10px;
+}
+
+.entry-excerpt {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--mid);
+}
+
+/* ========================================
+   Empty State
+======================================== */
+
+.empty-state {
+  padding: 48px 0 24px;
+  color: var(--mid);
+  font-size: 14px;
+}
+
+/* ========================================
+   Post Shell — 文章详情容器
+======================================== */
+
+.post-shell {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 28px 30px 40px;
+  margin-bottom: 48px;
+  transition: background 600ms var(--ease), border-color 600ms var(--ease);
+}
+
+/* ========================================
+   Post Navigation
+======================================== */
+
+.post-back {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mid);
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 28px;
+  transition: color 200ms var(--ease);
+}
+
+.post-back:hover {
+  color: var(--accent);
+}
+
+/* ========================================
+   Post Typography — 文章标题与元信息
+======================================== */
+
+.post-title {
+  font-size: 42px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.post-meta {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--mid);
+  margin-bottom: 36px;
+}
+
+/* ========================================
+   Markdown Content Styles
+======================================== */
+
+.post-content {
+  color: var(--text);
+}
+
+.post-content h1,
+.post-content h2,
+.post-content h3,
+.post-content h4,
+.post-content h5,
+.post-content h6 {
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+  margin: 2.2em 0 0.8em;
+}
+
+.post-content h1 { font-size: 28px; }
+.post-content h2 { font-size: 22px; }
+.post-content h3 { font-size: 18px; }
+.post-content h4 { font-size: 16px; }
+
+.post-content p {
+  margin-bottom: 1.4em;
+  line-height: 1.85;
+}
+
+.post-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(234, 88, 12, 0.4);
+  transition: text-decoration-color 200ms var(--ease), opacity 200ms var(--ease);
+}
+
+.post-content a:hover {
+  text-decoration-color: var(--accent);
+  opacity: 0.85;
+}
+
+.post-content ul,
+.post-content ol {
+  padding-left: 1.6em;
+  margin-bottom: 1.4em;
+}
+
+.post-content li {
+  margin-bottom: 0.4em;
+  line-height: 1.8;
+}
+
+.post-content blockquote {
+  border-left: 2px solid var(--accent);
+  padding: 4px 0 4px 18px;
+  color: var(--mid);
+  font-size: 15px;
+  margin: 1.8em 0;
+}
+
+.post-content blockquote p {
+  margin-bottom: 0;
+}
+
+.post-content code {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--accent);
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+}
+
+.post-content pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 20px 24px;
+  overflow-x: auto;
+  margin: 1.8em 0;
+  transition: background 600ms var(--ease), border-color 600ms var(--ease);
+}
+
+.code-block {
+  position: relative;
+  margin: 1.8em 0;
+}
+
+.code-block pre {
+  margin: 0;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  color: var(--mid);
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border-radius: 999px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 180ms var(--ease), color 180ms var(--ease), border-color 180ms var(--ease), transform 180ms var(--ease);
+}
+
+.code-block:hover .copy-btn,
+.copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  transform: translateY(-1px);
+}
+
+.copy-btn.is-copied {
+  opacity: 1;
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
+}
+
+.copy-btn.is-failed {
+  opacity: 1;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+}
+
+.post-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.post-content hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 2.4em 0;
+}
+
+.post-content img {
+  max-width: 100%;
+  border-radius: 2px;
+  display: block;
+  margin: 1.8em 0;
+}
+
+.post-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.8em 0;
+  font-size: 14px;
+}
+
+.post-content th,
+.post-content td {
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.post-content th {
+  color: var(--mid);
+  font-weight: 600;
+  background: var(--surface);
+}
+
+/* ========================================
+   Footer — Connect Links
+======================================== */
+
+.footer {
+  margin-top: 64px;
+  padding-top: 20px;
+}
+
+.footer-label {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mid);
+  opacity: 0.7;
+  margin-bottom: 12px;
+}
+
+.links-connect {
+  display: flex;
+  gap: 6px 16px;
+  flex-wrap: wrap;
+}
+
+.links-connect a {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--mid);
+  text-decoration: none;
+  transition: color 200ms var(--ease);
+}
+
+.links-connect a:hover {
+  color: var(--accent);
+}
+
+/* ========================================
+   Mode Switcher — 竹叶图标主题切换
+   ・日/D：实心竹叶（filled）
+   ・夜/N：镂空竹叶（outlined）
+   ・日/夜：大叶含叶脉  D/N：小叶无脉
+======================================== */
+
+.mode-indicator {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0.54;
+  transition: opacity 220ms var(--ease);
+}
+
+.mode-indicator:hover {
+  opacity: 1;
+}
+
+/* "MODE" 小标签 */
+.subtle-link.mode-label {
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mid);
+  opacity: 0.6;
+  margin-right: 5px;
+  user-select: none;
+}
+
+/* ── 按钮基础 ── */
+.mode-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px 4px;
+  border-radius: 3px;
+  position: relative;
+  line-height: 0;
+  color: var(--mid);
+  transition: color 200ms var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mode-btn:hover       { color: var(--text); }
+.mode-btn.is-active   { color: var(--accent); }
+.mode-btn:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── 墨竹图标（day / night）──
+   viewBox: 0 0 20 28，竹竿垂直居中，叶簇左右交替。
+   transform-origin 贴底（竹根位置），hover/spring 动效以根为轴摆动。
+── */
+.bamboo-icon {
+  display: block;
+  overflow: visible;
+  transform-origin: 50% 95%;
+  transition: transform 320ms var(--ease);
+  will-change: transform;
+}
+
+/* ── 日间墨竹：实心粗竿 + 背景色节环（切割出竹节）+ 实心叶 ── */
+.mode-btn[data-mode="day"] .bamboo-culm {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.0;
+  stroke-linecap: round;
+}
+
+/* 日间节环：用背景色横线切割粗竿，形成竹节分隔 */
+.mode-btn[data-mode="day"] .bamboo-ring {
+  stroke: var(--bg);
+  stroke-width: 1.3;
+  stroke-linecap: butt;
+}
+
+/* 日间侧枝（连接竹节与叶簇）*/
+.mode-btn[data-mode="day"] .bamboo-branch {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+/* 日间叶片：实心填充，窄叶 */
+.mode-btn[data-mode="day"] .bamboo-leaf {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ── 夜间墨竹：细轮廓竿 + 同色节环 + 宽叶镂空 ── */
+.mode-btn[data-mode="night"] .bamboo-culm {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* 夜间节环：背景色切割细竿，形成节痕（与日间技术对称） */
+.mode-btn[data-mode="night"] .bamboo-ring {
+  stroke: var(--bg);
+  stroke-width: 1.8;
+  stroke-linecap: butt;
+}
+
+/* 夜间侧枝 */
+.mode-btn[data-mode="night"] .bamboo-branch {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+/* 夜间叶片：宽叶镂空，描边 1.0 确保小尺寸可见空腔 */
+.mode-btn[data-mode="night"] .bamboo-leaf {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.0;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* ── 太阳 / 月亮图标（day-pure / night-pure）──
+   viewBox: 0 0 24 24 — 以图标中心旋转。
+── */
+.theme-icon {
+  display: block;
+  overflow: visible;
+  transform-origin: 50% 50%;
+  transition: transform 320ms var(--ease);
+  will-change: transform;
+}
+
+.theme-icon-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 太阳：暖金色，不随按钮状态变色（语义固定）*/
+.mode-btn[data-mode="day-pure"]            .theme-icon { color: #b08040; }
+.mode-btn[data-mode="day-pure"]:hover      .theme-icon { color: #c4920e; }
+.mode-btn[data-mode="day-pure"].is-active  .theme-icon { color: #c4920e; }
+
+/* 月亮：冷青灰，不随按钮状态变色（语义固定）*/
+.mode-btn[data-mode="night-pure"]            .theme-icon { color: #7a9ab2; }
+.mode-btn[data-mode="night-pure"]:hover      .theme-icon { color: #9ab8cc; }
+.mode-btn[data-mode="night-pure"].is-active  .theme-icon { color: #9ab8cc; }
+
+/* ══ 统一悬停动效 ══
+   竹枝：以根部为轴向左轻摆（风吹感）
+   太阳：顺时针微转（日出感）
+   月亮：向左微倾（月弦感，与竹枝一致）
+*/
+.mode-btn:hover .bamboo-icon                     { transform: rotate(-10deg); }
+.mode-btn[data-mode="day-pure"]:hover .theme-icon  { transform: rotate(20deg);  }
+/* 月亮：大角度倾斜 + 轻放大，幅度与竹枝/太阳一致 */
+.mode-btn[data-mode="night-pure"]:hover .theme-icon { transform: rotate(-22deg) scale(1.12); }
+
+/* ══ 统一激活态：全部放大 1.22×，颜色已各自处理 ══ */
+.mode-btn.is-active .bamboo-icon { transform: scale(1.22); }
+.mode-btn.is-active .theme-icon  { transform: scale(1.22); }
+
+.mode-btn.is-active:hover .bamboo-icon                       { transform: scale(1.22) rotate(-10deg); }
+.mode-btn[data-mode="day-pure"].is-active:hover  .theme-icon  { transform: scale(1.22) rotate(20deg);  }
+.mode-btn[data-mode="night-pure"].is-active:hover .theme-icon { transform: scale(1.22) rotate(-22deg); }
+
+/* ══ 统一点击弹跳（JS 添加 .leaf-spring 触发，animationend 移除）══ */
+@keyframes leafSpring {
+  0%   { transform: scale(1)    rotate(0deg);  }
+  20%  { transform: scale(0.76) rotate(14deg); }
+  52%  { transform: scale(1.18) rotate(-6deg); }
+  76%  { transform: scale(0.97) rotate(2deg);  }
+  100% { transform: scale(1)    rotate(0deg);  }
+}
+
+.mode-btn.leaf-spring .bamboo-icon,
+.mode-btn.leaf-spring .theme-icon {
+  animation: leafSpring 500ms var(--ease-slow) both;
+}
+
+/* ── Tooltip ── */
+.mode-btn::after {
+  content: attr(data-label);
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  background: var(--surface-strong);
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 150ms var(--ease), transform 150ms var(--ease);
+}
+
+.mode-btn:hover::after,
+.mode-btn:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ========================================
+   Highlight.js — 与主题协调
+======================================== */
+
+.post-content .hljs {
+  background: transparent;
+  padding: 0;
+}
+
+/* ========================================
+   Loading State
+======================================== */
+
+.loading {
+  color: var(--mid);
+  font-family: "Fragment Mono", "Courier New", monospace;
+  font-size: 12px;
+  padding: 40px 0;
+  opacity: 0.6;
+}
+
+/* =============================================
+   响应式 — 完整 5 断点策略
+   ≥1440 / 1024~1439 / 768~1023 / 480~767 / <480
+   ============================================= */
+
+/* ── 宽屏（≥1440px）：版心不变，视觉与字号略强化 ── */
+@media (min-width: 1440px) {
+  .page {
+    padding: 48px 48px 96px;
+  }
+  .logo-letter {
+    font-size: 88px;
+  }
+  .entry-title {
+    font-size: 34px;
+  }
+  .entry {
+    padding: 30px 0;
+  }
+  .post-title {
+    font-size: 46px;
+  }
+  .bio {
+    font-size: 19px;
+  }
+  .post-content p,
+  .post-content li {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+  .post-content h1 { font-size: 30px; }
+  .post-content h2 { font-size: 24px; }
+  .post-content h3 { font-size: 19px; }
+  .footer {
+    margin-top: 72px;
+  }
+}
+
+/* ── 平板（768~1023px）：减间距，缩字号，竹叶已弱化 ── */
+@media (max-width: 1023px) {
+  .page {
+    padding: 28px 28px 72px;
+  }
+  .logo-letter {
+    font-size: 62px;
+  }
+  .logo {
+    margin: 6px 0 14px;
+  }
+  .bio {
+    font-size: 17px;
+    margin-bottom: 26px;
+  }
+  .divider {
+    margin: 24px 0 28px;
+  }
+  .entry {
+    padding: 22px 0;
+  }
+  .grouped-entries {
+    gap: 28px;
+  }
+  .entry-title {
+    font-size: 26px;
+  }
+  .post-title {
+    font-size: 34px;
+  }
+  .post-meta {
+    margin-bottom: 30px;
+  }
+  .post-shell {
+    padding: 24px 26px 34px;
+    margin-bottom: 40px;
+  }
+  .post-content h1 { font-size: 25px; }
+  .post-content h2 { font-size: 20px; }
+  .post-content h3 { font-size: 17px; }
+  .footer {
+    margin-top: 48px;
+    padding-top: 18px;
+  }
+  .mode-indicator {
+    top: 16px;
+    right: 20px;
+    gap: 8px;
+  }
+}
+
+/* ── 手机（480~767px）：单列、加大行高、减字号 ── */
+@media (max-width: 767px) {
+  body {
+    line-height: 1.85;
+  }
+  .page {
+    padding: 20px 20px 64px;
+  }
+  .logo-letter {
+    font-size: 48px;
+  }
+  .logo {
+    margin: 4px 0 12px;
+  }
+  .bio {
+    font-size: 16px;
+    line-height: 1.9;
+    margin-bottom: 20px;
+  }
+  .divider {
+    margin: 20px 0 24px;
+  }
+  .entry {
+    padding: 20px 0;
+  }
+  .grouped-entries {
+    gap: 24px;
+  }
+  .entry-title {
+    font-size: 22px;
+    line-height: 1.45;
+    margin-bottom: 6px;
+  }
+  .entry-excerpt {
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .post-back {
+    margin-bottom: 22px;
+  }
+  .post-title {
+    font-size: 28px;
+    line-height: 1.38;
+    margin-bottom: 12px;
+  }
+  .post-meta {
+    margin-bottom: 26px;
+  }
+  .post-shell {
+    padding: 20px 18px 28px;
+    margin-bottom: 32px;
+  }
+  .post-content p {
+    line-height: 1.9;
+    margin-bottom: 1.3em;
+  }
+  .post-content li {
+    line-height: 1.85;
+  }
+  .post-content h1 { font-size: 22px; }
+  .post-content h2 { font-size: 19px; }
+  .post-content h3 { font-size: 17px; }
+  .post-content h4 { font-size: 15px; }
+  .post-content pre {
+    padding: 16px 18px;
+  }
+  .copy-btn {
+    top: 8px;
+    right: 8px;
+    opacity: 1;
+  }
+  .post-content blockquote {
+    padding-left: 14px;
+  }
+  .footer {
+    margin-top: 40px;
+    padding-top: 16px;
+  }
+  .mode-indicator {
+    top: 14px;
+    right: 16px;
+    gap: 2px;
+  }
+  .subtle-link.mode-label {
+    font-size: 8px;
+    margin-right: 3px;
+  }
+}
+
+/* ── 小屏手机（<480px）：极简，竹叶已接近隐藏 ── */
+@media (max-width: 479px) {
+  .page {
+    padding: 16px 16px 52px;
+  }
+  .logo-letter {
+    font-size: 42px;
+  }
+  .bio {
+    font-size: 15px;
+    margin-bottom: 18px;
+  }
+  .divider {
+    margin: 16px 0 20px;
+  }
+  .entry {
+    padding: 18px 0;
+  }
+  .grouped-entries {
+    gap: 20px;
+  }
+  .entry-title {
+    font-size: 20px;
+    line-height: 1.45;
+  }
+  .post-title {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+  .post-shell {
+    padding: 16px 14px 24px;
+    margin-bottom: 28px;
+  }
+  .post-content h1 { font-size: 20px; }
+  .post-content h2 { font-size: 17px; }
+  .post-content h3 { font-size: 15px; }
+  /* 代码块小屏下全宽，去除圆角提升可读性 */
+  .post-content pre {
+    padding: 14px 16px;
+    margin-left: -14px;
+    margin-right: -14px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .footer {
+    margin-top: 32px;
+    padding-top: 14px;
+  }
+  .mode-indicator {
+    top: 12px;
+    right: 12px;
+    gap: 2px;
+  }
+  .subtle-link.mode-label {
+    display: none; /* 极小屏隐藏 MODE 标签 */
+  }
+  /* 小屏竹枝图标略缩小 */
+  .bamboo-icon {
+    width: 13px;
+    height: 18px;
+  }
+}

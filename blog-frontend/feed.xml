@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>小盖</title>
+    <link>./</link>
+    <description>做有意思的事情</description>
+    <language>zh-CN</language>
+    <lastBuildDate>Wed, 10 Apr 2024 00:00:00 GMT</lastBuildDate>
+    <item>
+      <title>做有意思的事情</title>
+      <link>post.html?slug=doing-interesting-things</link>
+      <guid>post.html?slug=doing-interesting-things</guid>
+      <pubDate>Wed, 10 Apr 2024 00:00:00 GMT</pubDate>
+      <description>什么是有意思？不是宏大的，不是改变世界的，就是让你在做的时候想继续做下去的事情。</description>
+    </item>
+    <item>
+      <title>你好，世界</title>
+      <link>post.html?slug=hello-world</link>
+      <guid>post.html?slug=hello-world</guid>
+      <pubDate>Fri, 15 Mar 2024 00:00:00 GMT</pubDate>
+      <description>这是第一篇文章，关于开始一件事情的意义。没有被写下来的想法，就像没有被种下的种子。</description>
+    </item>
+  </channel>
+</rss>

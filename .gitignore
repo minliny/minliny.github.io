@@ -1,0 +1,11 @@
+.DS_Store
+
+# Local editor / agent state
+.claude/
+blog-frontend/.claude/
+
+# Local preview / render artifacts
+blog-frontend/.render-*.html
+
+# Local logs
+*.log
