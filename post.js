@@ -163,7 +163,7 @@ async function loadPost() {
   const descriptionEl = document.querySelector('meta[name="description"]');
 
   if (!slug) {
-    document.title = '文章不存在 · 小盖';
+    document.title = '文章不存在 · Minliny';
     titleEl.textContent = '文章不存在';
     metaEl.textContent = '';
     contentEl.innerHTML = `<p>这篇文章不存在，或者链接已经失效。</p><p><a href="index.html">返回首页</a></p>`;
@@ -186,10 +186,10 @@ async function loadPost() {
 
     // Page title
     const title = meta ? meta.title : slug;
-    document.title = `${title} · 小盖`;
+    document.title = `${title} · Minliny`;
     titleEl.textContent = title;
     if (descriptionEl) {
-      descriptionEl.setAttribute('content', meta?.excerpt || `${title} · 小盖`);
+      descriptionEl.setAttribute('content', meta?.excerpt || `${title} · Minliny`);
     }
 
     if (meta && meta.date) {
@@ -207,7 +207,7 @@ async function loadPost() {
     setupCopyButtons(contentEl);
 
   } catch (err) {
-    document.title = '加载失败 · 小盖';
+    document.title = '加载失败 · Minliny';
     titleEl.textContent = '文章不存在';
     metaEl.textContent = '';
     contentEl.innerHTML = `<p style="color:var(--mid);font-size:14px">${err.message}</p><p><a href="index.html">返回首页</a></p>`;

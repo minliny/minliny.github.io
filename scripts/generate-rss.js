@@ -52,7 +52,7 @@ function main() {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0">',
     '  <channel>',
-    '    <title>小盖</title>',
+    '    <title>Minliny</title>',
     `    <link>${escapeXml(resolveHomeLink())}</link>`,
     '    <description>做有意思的事情</description>',
     '    <language>zh-CN</language>',
