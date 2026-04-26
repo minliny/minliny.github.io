@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="做有意思的事情">
+  <meta property="og:title" content="小盖 · 做有意思的事情">
+  <meta property="og:description" content="做有意思的事情">
+  <title>小盖 · 做有意思的事情</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400&family=Fragment+Mono:ital@0;1&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css?v=20260426-theme9">
+</head>
+<body>
+  <!-- Shared Bamboo SVG — 日间墨竹 / 夜间墨竹 -->
+  <svg id="leaves-overlay" xmlns="http://www.w3.org/2000/svg"
+       viewBox="0 0 1440 1100"
+       preserveAspectRatio="xMidYMid slice"
+       width="100%" height="100%"
+       overflow="visible"
+       aria-hidden="true">
+
+    <defs>
+      <!-- 日间墨竹：暖灰淡墨，叶尖深、叶根淡 -->
+      <linearGradient id="bambooGrad" x1="0%" y1="0%" x2="30%" y2="100%">
+        <stop offset="0%" stop-color="#3c342a" stop-opacity="0.62"/>
+        <stop offset="100%" stop-color="#5a4832" stop-opacity="0.34"/>
+      </linearGradient>
+      <radialGradient id="dayInkWash" cx="82%" cy="10%" r="76%">
+        <stop offset="0%" stop-color="#5a4832" stop-opacity="0.10"/>
+        <stop offset="50%" stop-color="#7a6850" stop-opacity="0.05"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="dayInkBleed" x="-12%" y="-12%" width="124%" height="124%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.9"/>
+        <feGaussianBlur stdDeviation="0.45"/>
+      </filter>
+
+      <!-- ── 5 种竹叶：披针形，宽长比 1:6~1:13 ── -->
+      <!-- bl-1：中等叶，微对称，主叶 -->
+      <path id="bl-1" d="M 0,-58 C 8,-34 7,28 0,60 C -7,28 -8,-34 0,-58 Z"/>
+      <!-- bl-2：宽叶，稍不对称（叶基偏左），用于簇中心 -->
+      <path id="bl-2" d="M -1,-62 C 10,-36 9,30 0,63 C -9,30 -11,-37 -1,-62 Z"/>
+      <!-- bl-3：细长叶，加宽至宽长比 1:13，用量最多 -->
+      <path id="bl-3" d="M 0,-72 C 5.5,-44 5,40 0,74 C -5,40 -5.5,-44 0,-72 Z"/>
+      <!-- bl-4：短宽叶，用于叶簇外侧 -->
+      <path id="bl-4" d="M 1,-48 C 10,-27 9.5,22 0,50 C -9.5,22 -10,-27 1,-48 Z"/>
+      <!-- bl-5：弯曲叶，不对称，模拟风中偏折 -->
+      <path id="bl-5" d="M 2,-60 C -10,-34 -9,30 0,62 C 9,30 11,-36 2,-60 Z"/>
+
+      <!-- ── 三层模糊滤镜（仅高斯，保留竹叶轮廓） ── -->
+      <filter id="bf-far" x="-12%" y="-12%" width="124%" height="124%">
+        <feGaussianBlur stdDeviation="3.2"/>
+      </filter>
+      <filter id="bf-mid" x="-8%" y="-8%" width="116%" height="116%">
+        <feGaussianBlur stdDeviation="1.0"/>
+      </filter>
+      <filter id="bf-near" x="-5%" y="-5%" width="110%" height="110%">
+        <feGaussianBlur stdDeviation="0.35"/>
+      </filter>
+
+      <!-- ── 叶簇组合：5叶"介"形（100°展开）、4叶"个"形（60°展开）、2叶"人"形 ── -->
+      <symbol id="cluster-5" overflow="visible">
+        <use href="#bl-1" transform="rotate(132) translate(0,-58)"/>
+        <use href="#bl-3" transform="rotate(152) translate(0,-72)"/>
+        <use href="#bl-3" transform="rotate(178) translate(0,-72)"/>
+        <use href="#bl-3" transform="rotate(204) translate(0,-72)"/>
+        <use href="#bl-1" transform="rotate(228) translate(0,-58)"/>
+      </symbol>
+      <symbol id="cluster-3" overflow="visible">
+        <use href="#bl-3" transform="rotate(148) translate(0,-72)"/>
+        <use href="#bl-3" transform="rotate(174) translate(0,-72)"/>
+        <use href="#bl-2" transform="rotate(200) translate(0,-62)"/>
+        <use href="#bl-4" transform="rotate(222) translate(0,-48)"/>
+      </symbol>
+      <symbol id="cluster-2" overflow="visible">
+        <use href="#bl-1" transform="rotate(162) translate(0,-58)"/>
+        <use href="#bl-5" transform="rotate(198) translate(0,-60)"/>
+      </symbol>
+
+      <!-- ── 长竹枝：主枝 + 三个叶簇节点 ── -->
+      <symbol id="spray-a" overflow="visible">
+        <path d="M 0,0 C -28,40 -58,82 -88,128 C -112,165 -134,200 -156,234"
+              fill="none" stroke="#463a2d" stroke-width="1.8" stroke-opacity="0.26"
+              stroke-linecap="round"/>
+        <use href="#cluster-3" transform="translate(-30,42) scale(0.82)"/>
+        <use href="#cluster-5" transform="translate(-90,134) scale(0.92)"/>
+        <use href="#cluster-3" transform="translate(-156,232) scale(0.76)"/>
+      </symbol>
+
+      <!-- ── 中等枝 ── -->
+      <symbol id="spray-b" overflow="visible">
+        <path d="M 0,0 C -22,32 -46,64 -72,98 C -90,122 -106,142 -122,162"
+              fill="none" stroke="#463a2d" stroke-width="1.5" stroke-opacity="0.22"
+              stroke-linecap="round"/>
+        <use href="#cluster-3" transform="translate(-26,38) scale(0.75)"/>
+        <use href="#cluster-5" transform="translate(-86,120) scale(0.82)"/>
+        <use href="#cluster-2" transform="translate(-122,162) scale(0.7)"/>
+      </symbol>
+
+      <!-- ── 短末梢枝 ── -->
+      <symbol id="spray-c" overflow="visible">
+        <path d="M 0,0 C -18,24 -34,46 -52,72"
+              fill="none" stroke="#463a2d" stroke-width="1.3" stroke-opacity="0.2"
+              stroke-linecap="round"/>
+        <use href="#cluster-5" transform="translate(-52,72) scale(0.78)"/>
+      </symbol>
+
+      <!-- ── 竹竿：主干 + 5 处竹节 ── -->
+      <symbol id="culm" overflow="visible">
+        <path d="M 0,0 C -42,75 -94,170 -150,275 C -198,360 -244,440 -284,510"
+              fill="none" stroke="#463a2d" stroke-width="3.0" stroke-opacity="0.28"
+              stroke-linecap="round"/>
+        <ellipse cx="-44" cy="78" rx="6.5" ry="2.5" fill="#332a20" opacity="0.32" transform="rotate(-30 -44 78)"/>
+        <ellipse cx="-94" cy="170" rx="7" ry="2.5" fill="#332a20" opacity="0.32" transform="rotate(-32 -94 170)"/>
+        <ellipse cx="-148" cy="272" rx="6.5" ry="2.5" fill="#332a20" opacity="0.32" transform="rotate(-34 -148 272)"/>
+        <ellipse cx="-200" cy="362" rx="6.5" ry="2.5" fill="#332a20" opacity="0.32" transform="rotate(-36 -200 362)"/>
+        <ellipse cx="-248" cy="448" rx="6" ry="2.5" fill="#332a20" opacity="0.32" transform="rotate(-38 -248 448)"/>
+      </symbol>
+    </defs>
+
+    <!-- 墨晕背景 -->
+    <rect width="1440" height="1100" fill="url(#dayInkWash)"/>
+
+    <!-- ══════════════════════════════════
+         远景：最虚最淡，营造竹林深度
+    ══════════════════════════════════ -->
+    <g class="bamboo-far" fill="url(#bambooGrad)" filter="url(#bf-far)" opacity="0.3">
+      <use href="#spray-a" transform="translate(1260,-30) scale(1.85) rotate(10)"/>
+      <use href="#spray-b" transform="translate(1090,200) scale(1.55) rotate(-3)"/>
+      <use href="#spray-a" transform="translate(900,380) scale(1.5) rotate(18)"/>
+      <use href="#spray-c" transform="translate(740,560) scale(1.4)"/>
+      <animateTransform attributeName="transform" type="translate"
+                        values="0,0; 5,3; -2,-1; 0,0"
+                        dur="34s" repeatCount="indefinite"/>
+    </g>
+
+    <!-- ══════════════════════════════════
+         中景：竹竿 + 三条主枝，叶簇可辨
+    ══════════════════════════════════ -->
+    <g class="bamboo-mid" fill="url(#bambooGrad)" filter="url(#bf-mid)" opacity="0.58">
+      <g class="bamboo-branch-a">
+        <use href="#culm" transform="translate(1210,-90) scale(1.25) rotate(14)"/>
+        <use href="#spray-a" transform="translate(1150,30) scale(1.2) rotate(22)"/>
+        <use href="#spray-b" transform="translate(1040,200) scale(1.1) rotate(16)"/>
+        <use href="#spray-c" transform="translate(930,360) scale(0.95)"/>
+        <animateTransform attributeName="transform" type="translate"
+                          values="0,0; 5,3; -2,4; 1,-1; 0,0"
+                          dur="24s" repeatCount="indefinite"/>
+      </g>
+
+      <g class="bamboo-branch-b">
+        <use href="#spray-a" transform="translate(1290,80) scale(1.1) rotate(28)"/>
+        <use href="#spray-b" transform="translate(1160,260) scale(1.05) rotate(20)"/>
+        <use href="#spray-c" transform="translate(1000,420) scale(0.9)"/>
+        <animateTransform attributeName="transform" type="translate"
+                          values="0,0; -3,4; 4,2; -1,3; 0,0"
+                          dur="29s" repeatCount="indefinite"/>
+      </g>
+
+      <g class="bamboo-branch-c">
+        <!-- culm enters from off-screen top-right, drapes to lower-left -->
+        <use href="#culm" transform="translate(1460,-50) scale(0.80)"/>
+        <!-- mid spray off the culm trunk -->
+        <use href="#spray-b" transform="translate(1310,170) scale(0.88) rotate(12)"/>
+        <!-- lower sprays continue the drape -->
+        <use href="#spray-b" transform="translate(1190,440) scale(1.0) rotate(10)"/>
+        <use href="#spray-c" transform="translate(1040,590) scale(0.85)"/>
+        <animateTransform attributeName="transform" type="translate"
+                          values="0,0; 4,-2; -2,4; 1,2; 0,0"
+                          dur="21s" repeatCount="indefinite"/>
+      </g>
+    </g>
+
+    <!-- ══════════════════════════════════
+         近景：最清晰，叶型最明显
+    ══════════════════════════════════ -->
+    <g class="bamboo-near" fill="url(#bambooGrad)" filter="url(#bf-near)" opacity="0.72">
+      <g class="bamboo-branch-d">
+        <use href="#culm" transform="translate(1250,-60) scale(0.95) rotate(18)"/>
+        <use href="#spray-a" transform="translate(1200,40) scale(0.95) rotate(24)"/>
+        <use href="#spray-c" transform="translate(1090,210) scale(0.8)"/>
+        <animateTransform attributeName="transform" type="translate"
+                          values="0,0; 3,2; -2,3; 1,-1; 0,0"
+                          dur="16s" repeatCount="indefinite"/>
+      </g>
+
+      <g class="bamboo-branch-e">
+        <!-- spray-a enters from off-screen top-right, tip connects into spray-b below -->
+        <use href="#spray-a" transform="translate(1440,-40) scale(0.82) rotate(22)"/>
+        <use href="#spray-b" transform="translate(1260,160) scale(0.85) rotate(30)"/>
+        <use href="#spray-c" transform="translate(1160,290) scale(0.72)"/>
+        <animateTransform attributeName="transform" type="translate"
+                          values="0,0; -2,3; 4,1; -1,2; 0,0"
+                          dur="19s" repeatCount="indefinite"/>
+      </g>
+    </g>
+  </svg>
+
+  <!-- 主题切换：竹叶图标 -->
+  <nav class="mode-indicator" aria-label="主题切换">
+    <span class="subtle-link mode-label" aria-hidden="true">MODE</span>
+
+    <!-- 日间墨竹：粗实心竹竿 + 背景色节环 + 侧枝 + 实心叶 -->
+    <button class="mode-btn" data-mode="day" data-label="日间·墨竹" title="日间·墨竹" aria-label="日间墨竹">
+      <svg class="bamboo-icon" viewBox="0 0 20 28" width="16" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- 竹竿 -->
+        <path class="bamboo-culm" d="M 10,27 C 9.7,21 10,16 10.3,10 C 10.6,6 11,3 11.2,1"/>
+        <!-- 下节环（两道横线切割竹竿）-->
+        <line class="bamboo-ring" x1="7" y1="20" x2="13" y2="20"/>
+        <line class="bamboo-ring" x1="7" y1="21.3" x2="13" y2="21.3"/>
+        <!-- 上节环 -->
+        <line class="bamboo-ring" x1="7.5" y1="11" x2="13.5" y2="11"/>
+        <line class="bamboo-ring" x1="7.5" y1="12.3" x2="13.5" y2="12.3"/>
+        <!-- 下侧枝（向右）-->
+        <line class="bamboo-branch" x1="10.3" y1="20.6" x2="13.5" y2="20.6"/>
+        <!-- 上侧枝（向左）-->
+        <line class="bamboo-branch" x1="10.1" y1="11.6" x2="6.5" y2="11.6"/>
+        <!-- 下叶簇（右，实心窄叶）-->
+        <path class="bamboo-leaf" transform="translate(13.5,20.6) rotate(10)"  d="M 0,0 C 1,-2 1,-5 0,-7 C -1,-5 -1,-2 0,0 Z"/>
+        <path class="bamboo-leaf" transform="translate(13.5,20.6) rotate(48)"  d="M 0,0 C 1,-2 1,-5 0,-7 C -1,-5 -1,-2 0,0 Z"/>
+        <!-- 上叶簇（左，实心窄叶）-->
+        <path class="bamboo-leaf" transform="translate(6.5,11.6) rotate(-55)" d="M 0,0 C 1,-2 1,-5 0,-7 C -1,-5 -1,-2 0,0 Z"/>
+        <path class="bamboo-leaf" transform="translate(6.5,11.6) rotate(-15)" d="M 0,0 C 1,-2 1,-5 0,-7 C -1,-5 -1,-2 0,0 Z"/>
+      </svg>
+    </button>
+
+    <!-- 夜间墨竹：细轮廓竹竿 + 同色节环 + 侧枝 + 宽叶镂空 -->
+    <button class="mode-btn" data-mode="night" data-label="夜间·墨竹" title="夜间·墨竹" aria-label="夜间墨竹">
+      <svg class="bamboo-icon" viewBox="0 0 20 28" width="16" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- 竹竿 -->
+        <path class="bamboo-culm" d="M 10,27 C 9.7,21 10,16 10.3,10 C 10.6,6 11,3 11.2,1"/>
+        <!-- 下节环 -->
+        <line class="bamboo-ring" x1="7" y1="20" x2="13" y2="20"/>
+        <line class="bamboo-ring" x1="7" y1="21.3" x2="13" y2="21.3"/>
+        <!-- 上节环 -->
+        <line class="bamboo-ring" x1="7.5" y1="11" x2="13.5" y2="11"/>
+        <line class="bamboo-ring" x1="7.5" y1="12.3" x2="13.5" y2="12.3"/>
+        <!-- 下侧枝（向右）-->
+        <line class="bamboo-branch" x1="10.3" y1="20.6" x2="13.5" y2="20.6"/>
+        <!-- 上侧枝（向左）-->
+        <line class="bamboo-branch" x1="10.1" y1="11.6" x2="6.5" y2="11.6"/>
+        <!-- 下叶簇（右，镂空宽叶）-->
+        <path class="bamboo-leaf" transform="translate(13.5,20.6) rotate(10)"  d="M 0,0 C 1.5,-2 1.5,-5 0,-7 C -1.5,-5 -1.5,-2 0,0 Z"/>
+        <path class="bamboo-leaf" transform="translate(13.5,20.6) rotate(48)"  d="M 0,0 C 1.5,-2 1.5,-5 0,-7 C -1.5,-5 -1.5,-2 0,0 Z"/>
+        <!-- 上叶簇（左，镂空宽叶）-->
+        <path class="bamboo-leaf" transform="translate(6.5,11.6) rotate(-55)" d="M 0,0 C 1.5,-2 1.5,-5 0,-7 C -1.5,-5 -1.5,-2 0,0 Z"/>
+        <path class="bamboo-leaf" transform="translate(6.5,11.6) rotate(-15)" d="M 0,0 C 1.5,-2 1.5,-5 0,-7 C -1.5,-5 -1.5,-2 0,0 Z"/>
+      </svg>
+    </button>
+
+    <!-- 日间普通：常规太阳图标 -->
+    <button class="mode-btn" data-mode="day-pure" data-label="日间·普通" title="日间·普通" aria-label="日间普通">
+      <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle class="theme-icon-stroke" cx="12" cy="12" r="4.25"/>
+        <path class="theme-icon-stroke" d="M12 2.75v3.1M12 18.15v3.1M21.25 12h-3.1M5.85 12h-3.1M18.54 5.46l-2.2 2.2M7.66 16.34l-2.2 2.2M18.54 18.54l-2.2-2.2M7.66 7.66l-2.2-2.2"/>
+      </svg>
+    </button>
+
+    <!-- 夜间普通：常规月亮图标 -->
+    <button class="mode-btn" data-mode="night-pure" data-label="夜间·普通" title="夜间·普通" aria-label="夜间普通">
+      <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path class="theme-icon-stroke" d="M15.4 3.4a8.5 8.5 0 1 0 5.2 15.2A9.2 9.2 0 1 1 15.4 3.4z"/>
+      </svg>
+    </button>
+  </nav>
+
+  <div class="page">
+
+    <!-- Header -->
+    <header>
+      <a class="logo" href="index.html" aria-label="回到首页">
+        <span class="logo-letter">小盖</span>
+        <span class="logo-hint">xiaogai · doing interesting things</span>
+      </a>
+      <p class="bio">做有意思的事情</p>
+    </header>
+
+    <hr class="divider">
+
+    <!-- Article list -->
+    <main id="main-content">
+      <div class="entries grouped-entries" id="entries-list" aria-label="文章列表"></div>
+      <div class="empty-state" id="empty-state" style="display:none">
+        还没有发布文章。
+      </div>
+      <div class="loading" id="loading-state">加载中…</div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-label">Connect</div>
+      <div class="links-connect">
+        <a href="feed.xml">RSS</a>
+        <a href="https://www.xiaohongshu.com" target="_blank" rel="noopener noreferrer">小红书</a>
+        <a href="mailto:gainubi@gmail.com">邮箱</a>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="app.js?v=20260426-theme9"></script>
+</body>
+</html>
