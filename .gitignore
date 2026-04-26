@@ -9,3 +9,8 @@ blog-frontend/.render-*.html
 
 # Local logs
 *.log
+
+# Blog local environment and dependencies
+blog-frontend/.env
+blog-frontend/.env.local
+blog-frontend/node_modules/
