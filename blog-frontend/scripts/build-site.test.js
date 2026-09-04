@@ -7,6 +7,7 @@ const test = require('node:test');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const BUILD_SCRIPT = path.join(ROOT_DIR, 'scripts', 'build-site.js');
+const VALIDATE_SCRIPT = path.join(ROOT_DIR, 'scripts', 'validate-dist.js');
 
 test('build sanitizes article HTML and keeps the publishing boundary clean', (t) => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mozhu-build-test-'));
@@ -44,4 +45,55 @@ aliases: []
   assert.doesNotMatch(content, /javascript:/i);
   assert.doesNotMatch(content, /onload=/i);
   assert.doesNotMatch(article, /node_modules|package-lock\.json|\.env/);
+});
+
+test('SITE_URL is consistent across discovery metadata and output validation', (t) => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mozhu-site-url-test-'));
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  const contentDir = path.join(ROOT_DIR, 'content', 'fixtures');
+  const outputDir = path.join(temporaryRoot, 'dist');
+  const siteUrl = 'https://canonical.example.test/blog';
+
+  const build = spawnSync(process.execPath, [
+    BUILD_SCRIPT,
+    '--content', contentDir,
+    '--output', outputDir,
+    '--site-url', siteUrl,
+  ], {
+    cwd: ROOT_DIR,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stderr || build.stdout);
+
+  const home = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
+  const article = fs.readFileSync(path.join(outputDir, 'posts', 'hello-world', 'index.html'), 'utf8');
+  const feed = fs.readFileSync(path.join(outputDir, 'feed.xml'), 'utf8');
+  const sitemap = fs.readFileSync(path.join(outputDir, 'sitemap.xml'), 'utf8');
+  const robots = fs.readFileSync(path.join(outputDir, 'robots.txt'), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(path.join(outputDir, 'content-manifest.json'), 'utf8'));
+
+  assert.match(home, /<link rel="canonical" href="https:\/\/canonical\.example\.test\/blog\/">/);
+  assert.match(home, /<meta property="og:url" content="https:\/\/canonical\.example\.test\/blog\/">/);
+  assert.match(article, /<link rel="canonical" href="https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/">/);
+  assert.match(article, /<meta property="og:url" content="https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/">/);
+  assert.match(feed, /<link>https:\/\/canonical\.example\.test\/blog\/<\/link>/);
+  assert.match(feed, /<guid>https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/<\/guid>/);
+  assert.match(sitemap, /<loc>https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/<\/loc>/);
+  assert.match(robots, /Sitemap: https:\/\/canonical\.example\.test\/blog\/sitemap\.xml/);
+  assert.equal(manifest.siteUrl, siteUrl);
+
+  const validation = spawnSync(process.execPath, [VALIDATE_SCRIPT, '--output', outputDir], {
+    cwd: ROOT_DIR,
+    env: { ...process.env, SITE_URL: siteUrl },
+    encoding: 'utf8',
+  });
+  assert.equal(validation.status, 0, validation.stderr || validation.stdout);
+
+  const mismatch = spawnSync(process.execPath, [VALIDATE_SCRIPT, '--output', outputDir], {
+    cwd: ROOT_DIR,
+    env: { ...process.env, SITE_URL: 'https://wrong.example.test' },
+    encoding: 'utf8',
+  });
+  assert.equal(mismatch.status, 1);
+  assert.match(`${mismatch.stdout}\n${mismatch.stderr}`, /does not (?:use|match) SITE_URL/);
 });

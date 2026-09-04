@@ -19,7 +19,7 @@ cp .env.example .env
 
 - `NOTION_TOKEN`
 - `NOTION_DATABASE_ID`
-- `SITE_URL`
+- `SITE_URL`（可选；默认使用 `site.config.json` 中的 `https://blog.minliny.com`）
 
 ## 首次验证
 

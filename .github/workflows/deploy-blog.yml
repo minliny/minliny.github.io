@@ -10,12 +10,13 @@ on:
     - cron: '17,47 * * * *'
 
 permissions:
+  actions: read
   contents: read
   models: read
 
 concurrency:
   group: pages-${{ github.repository }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -27,6 +28,7 @@ jobs:
         working-directory: blog-frontend
     env:
       ALLOW_EMPTY_NOTION_SYNC: '0'
+      SITE_URL: https://blog.minliny.com
 
     steps:
       - name: Checkout
@@ -51,17 +53,10 @@ jobs:
         run: |
           if [ "$GITHUB_REPOSITORY" = "${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY_OWNER}.github.io" ]; then
             echo "mode=notion" >> "$GITHUB_OUTPUT"
+            echo "directory=.content/notion" >> "$GITHUB_OUTPUT"
           else
             echo "mode=fixtures" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Derive site URL
-        shell: bash
-        run: |
-          if [ "$GITHUB_REPOSITORY" = "${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY_OWNER}.github.io" ]; then
-            echo "SITE_URL=https://${GITHUB_REPOSITORY_OWNER}.github.io" >> "$GITHUB_ENV"
-          else
-            echo "SITE_URL=https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}" >> "$GITHUB_ENV"
+            echo "directory=content/fixtures" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Diagnose Notion connection
@@ -85,15 +80,8 @@ jobs:
       - name: Test content and build code
         run: npm test
 
-      - name: Build Notion site
-        if: steps.content.outputs.mode == 'notion'
-        env:
-          CONTENT_DIR: .content/notion
-        run: npm run build:notion
-
-      - name: Build fixture site
-        if: steps.content.outputs.mode == 'fixtures'
-        run: npm run build:fixtures
+      - name: Build site once
+        run: node scripts/build-site.js --content "${{ steps.content.outputs.directory }}" --site-url "$SITE_URL"
 
       - name: Validate publish artifact
         run: npm run validate
@@ -129,15 +117,77 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
 
+  server_deploy:
+    name: Deploy canonical server
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download exact site snapshot
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-snapshot-${{ github.sha }}-${{ github.run_id }}
+          path: release/site
+
+      - name: Package and stream release to forced-command SSH
+        shell: bash
+        env:
+          BLOG_DEPLOY_SSH_KEY: ${{ secrets.BLOG_DEPLOY_SSH_KEY }}
+          BLOG_SSH_KNOWN_HOSTS: ${{ vars.BLOG_SSH_KNOWN_HOSTS }}
+          BLOG_SSH_HOST: ${{ vars.BLOG_SSH_HOST }}
+          BLOG_SSH_USER: ${{ vars.BLOG_SSH_USER }}
+        run: |
+          set -euo pipefail
+          : "${BLOG_DEPLOY_SSH_KEY:?BLOG_DEPLOY_SSH_KEY is required}"
+          : "${BLOG_SSH_KNOWN_HOSTS:?BLOG_SSH_KNOWN_HOSTS is required}"
+          : "${BLOG_SSH_HOST:?BLOG_SSH_HOST is required}"
+          : "${BLOG_SSH_USER:?BLOG_SSH_USER is required}"
+          [[ "$BLOG_SSH_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "BLOG_SSH_HOST has an invalid format" >&2; exit 1; }
+          [[ "$BLOG_SSH_USER" =~ ^[A-Za-z_][A-Za-z0-9._-]*$ ]] || { echo "BLOG_SSH_USER has an invalid format" >&2; exit 1; }
+
+          archive_path="$RUNNER_TEMP/blog-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+          key_path="$RUNNER_TEMP/blog-deploy-key"
+          known_hosts_path="$RUNNER_TEMP/blog-known-hosts"
+          trap 'rm -f "$archive_path" "$key_path" "$known_hosts_path"' EXIT
+
+          tar --create --gzip --file "$archive_path" --directory release/site .
+          archive_sha256="$(sha256sum "$archive_path" | awk '{ print $1 }')"
+          printf '%s\n' "$BLOG_DEPLOY_SSH_KEY" > "$key_path"
+          printf '%s\n' "$BLOG_SSH_KNOWN_HOSTS" > "$known_hosts_path"
+          chmod 600 "$key_path" "$known_hosts_path"
+
+          cat "$archive_path" | ssh \
+            -i "$key_path" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts_path" \
+            "${BLOG_SSH_USER}@${BLOG_SSH_HOST}" \
+            "deploy $GITHUB_SHA $GITHUB_RUN_ID $archive_sha256"
+
   smoke:
-    needs: deploy
-    if: needs.deploy.result == 'success'
+    needs: [deploy, server_deploy]
+    if: needs.deploy.result == 'success' && needs.server_deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check published home and manifest
+      - name: Checkout smoke checker
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+
+      - name: Check canonical domain and Pages mirror
         env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-        run: |
-          curl --fail --location --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 "$PAGE_URL"
-          curl --fail --location --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 "${PAGE_URL%/}/content-manifest.json"
+          CANONICAL_URL: https://blog.minliny.com
+          MIRROR_URL: https://minliny.github.io
+          SMOKE_ATTEMPTS: '15'
+          SMOKE_DELAY_MS: '12000'
+          SMOKE_REQUEST_TIMEOUT_MS: '10000'
+        run: node blog-frontend/scripts/smoke-deployment.js

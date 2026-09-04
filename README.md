@@ -22,7 +22,7 @@
 1. 从 Notion 数据库读取 `Published` 文章并校验统一内容契约
 2. 将正文、内容寻址媒体和 `manifest.json` 原子写入 `.content/notion/`
 3. 在构建期把 Markdown 转成安全 HTML、索引、RSS、sitemap 和历史 Slug 重定向
-4. 只把经过校验的 `blog-frontend/dist/` 发布到 GitHub Pages
+4. 把同一份经过校验的 `blog-frontend/dist/` 发布到主站服务器和 GitHub Pages
 
 ## 核心功能
 
@@ -35,7 +35,7 @@
 - 生成 RSS `feed.xml`
 - 生成 `content-manifest.json`、`sitemap.xml` 和历史 Slug 重定向
 - 构建产物包含 CSP、HTML 消毒、协议白名单和完整性校验
-- 通过 GitHub Actions 自动构建并部署到 GitHub Pages
+- 通过 GitHub Actions 自动构建，并从同一快照部署主站服务器和 GitHub Pages
 - 支持本地静态预览
 
 ## 设计说明
@@ -54,7 +54,7 @@
 - 内容来源改为以 Notion 数据库为发布后台
 - 通过 Node.js 脚本将 Notion 页面同步为本地 Markdown
 - 额外生成 `posts.json` 和 `feed.xml` 作为静态分发产物
-- 使用 GitHub Actions 自动构建，并发布到 GitHub Pages
+- 使用 GitHub Actions 自动构建，并发布到主站服务器和 GitHub Pages
 - 仓库结构、同步逻辑、发布链路和开源文档均按模板项目场景重新整理
 
 如果你打算基于本项目继续定制，建议把站点文案、品牌名、配色、页眉页脚信息和示例文章替换为你自己的版本。
@@ -132,10 +132,10 @@ npm install
 
 环境变量必须通过 `.env` 或 GitHub Secrets 配置，不要提交真实 Token。
 
-对于当前仓库 `minliny/MoZhu_Blog`，如果你使用 GitHub Pages 默认域名，本地 `.env` 中的 `SITE_URL` 可配置为：
+本地需要显式覆盖 canonical 主域时，可在 `.env` 中配置：
 
 ```bash
-SITE_URL=https://minliny.github.io/MoZhu_Blog
+SITE_URL=https://blog.minliny.com
 ```
 
 ### 3. 从 Notion 同步文章
@@ -178,7 +178,7 @@ npm run serve
 | --- | --- | --- |
 | `NOTION_TOKEN` | 是 | Notion Integration Token |
 | `NOTION_DATABASE_ID` | 是 | Notion 数据库 ID |
-| `SITE_URL` | 否 | 站点公开访问地址，用于 RSS、sitemap 和 canonical；工作流会自动推导 |
+| `SITE_URL` | 否 | canonical 主域，用于 Open Graph、RSS、sitemap、manifest 和 robots；默认读取 `site.config.json` |
 | `ALLOW_EMPTY_NOTION_SYNC` | 否 | 设为 `1` 时允许数据库为空（默认拒绝空快照） |
 | `CONTENT_DIR` | 否 | Notion 快照目录，默认 `.content/notion` |
 | `AI_SUMMARY_TOKEN` | 否 | 本地智能摘要所需 Token；Actions 自动使用 `github.token` |
@@ -217,18 +217,24 @@ npm run sync:notion:dry
 
 1. `minliny.github.io` 仓库从 Notion 生成生产快照；模板仓库使用 `content/fixtures`
 2. 每 30 分钟检查一次，也支持 `workflow_dispatch` 和 `repository_dispatch`（`notion_publish`）
-3. 执行测试、构建、产物完整性校验
-4. 只上传 `blog-frontend/dist/`，同时保留带 Commit SHA 的 90 天快照
-5. 部署后通过 HTTP 检查首页和 `content-manifest.json`
+3. 执行测试、单次构建和主域 URL 一致性校验
+4. 上传 `blog-frontend/dist/`，同时保留带 Commit SHA 的 90 天快照
+5. 从同一快照部署 Pages 和主站服务器，两边成功后检查双域首页与 `content-manifest.json`
 
 需要在 GitHub 仓库 Secrets 中配置：
 
 - `NOTION_TOKEN`
 - `NOTION_DATABASE_ID`
+- `BLOG_DEPLOY_SSH_KEY`
 
-当前仓库部署到 GitHub Pages 后，默认公开地址将是：
+还需要配置仓库 Variables `BLOG_SSH_HOST`、`BLOG_SSH_USER` 和 `BLOG_SSH_KNOWN_HOSTS`。详情见 [BLOG_PUBLISHING.md](BLOG_PUBLISHING.md)。
 
-- [https://minliny.github.io/MoZhu_Blog](https://minliny.github.io/MoZhu_Blog)
+当前站点地址：
+
+- 主域：[https://blog.minliny.com](https://blog.minliny.com)
+- Pages 镜像：[https://minliny.github.io](https://minliny.github.io)
+
+日常更新和回滚步骤见 [BLOG_PUBLISHING.md](BLOG_PUBLISHING.md)。
 
 ## 部署方式
 
@@ -236,6 +242,7 @@ npm run sync:notion:dry
 
 - GitHub Pages：已实现
 - GitHub Actions 自动部署：已实现
+- 主站服务器部署：工作流已实现，启用前需配置受限 forced command、Secrets 和 Variables
 - Vercel：待配置
 - Netlify：待配置
 

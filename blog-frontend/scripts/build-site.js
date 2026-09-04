@@ -613,6 +613,14 @@ function buildFeeds({ articles, config, siteUrl, outputDir }) {
     '</urlset>',
   ].join('\n');
   writeFile(outputDir, 'sitemap.xml', sitemap);
+
+  const robots = [
+    'User-agent: *',
+    'Allow: /',
+    '',
+    `Sitemap: ${absoluteUrl(siteUrl, 'sitemap.xml') || 'sitemap.xml'}`,
+  ].join('\n');
+  writeFile(outputDir, 'robots.txt', robots);
 }
 
 function copyMedia(contentDir, outputDir) {

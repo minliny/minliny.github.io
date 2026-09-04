@@ -6,9 +6,8 @@
 
 - `NOTION_TOKEN`
 - `NOTION_DATABASE_ID`
-- `SITE_URL`（仅 RSS/绝对链接需要）
 
-至少有一个必填变量未配置。
+至少有一个 Notion 必填变量未配置。`SITE_URL` 未设置时会使用 `site.config.json` 的主域。
 
 处理：
 
