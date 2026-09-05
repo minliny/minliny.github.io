@@ -97,3 +97,70 @@ test('SITE_URL is consistent across discovery metadata and output validation', (
   assert.equal(mismatch.status, 1);
   assert.match(`${mismatch.stdout}\n${mismatch.stderr}`, /does not (?:use|match) SITE_URL/);
 });
+
+test('build preserves legacy groups and reads a missing group from site.config', (t) => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mozhu-groups-test-'));
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  const contentDir = path.join(temporaryRoot, 'content');
+  const outputDir = path.join(temporaryRoot, 'dist');
+  fs.cpSync(path.join(ROOT_DIR, 'content', 'fixtures'), contentDir, { recursive: true });
+  fs.writeFileSync(path.join(contentDir, 'posts', 'research-note.md'), `---
+notionId: fixture-research-note
+title: Research note
+date: 2026-04-28
+updatedAt: 2026-04-28T00:00:00.000Z
+excerpt: Dynamic group regression fixture
+group: 研究札记
+tags: []
+cover: ""
+aliases: []
+---
+
+Research body.
+`, 'utf8');
+  fs.writeFileSync(path.join(contentDir, 'posts', 'default-note.md'), `---
+notionId: fixture-default-note
+title: Default note
+date: 2026-04-27
+updatedAt: 2026-04-27T00:00:00.000Z
+excerpt: Default group regression fixture
+tags: []
+cover: ""
+aliases: []
+---
+
+Default body.
+`, 'utf8');
+
+  const build = spawnSync(process.execPath, [BUILD_SCRIPT, '--content', contentDir, '--output', outputDir], {
+    cwd: ROOT_DIR,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stderr || build.stdout);
+  const home = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
+  const posts = JSON.parse(fs.readFileSync(path.join(outputDir, 'posts.json'), 'utf8'));
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'site.config.json'), 'utf8'));
+  assert.match(home, /<h2 class="group-title">研究札记<\/h2>/);
+  assert.match(home, /href="posts\/research-note\/"/);
+  assert.match(home, /href="posts\/default-note\/"/);
+  assert.equal(posts.find((post) => post.slug === 'research-note').group, '研究札记');
+  assert.equal(posts.find((post) => post.slug === 'default-note').group, config.content.defaultGroup);
+});
+
+test('build does not require a specially configured Notion about article', (t) => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mozhu-about-test-'));
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  const contentDir = path.join(temporaryRoot, 'content');
+  const outputDir = path.join(temporaryRoot, 'dist');
+  fs.cpSync(path.join(ROOT_DIR, 'content', 'fixtures'), contentDir, { recursive: true });
+  fs.rmSync(path.join(contentDir, 'posts', 'about.md'));
+
+  const build = spawnSync(process.execPath, [BUILD_SCRIPT, '--content', contentDir, '--output', outputDir], {
+    cwd: ROOT_DIR,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stderr || build.stdout);
+  const about = fs.readFileSync(path.join(outputDir, 'about.html'), 'utf8');
+  assert.match(about, /<h1 class="post-title">关于 Minliny<\/h1>/);
+  assert.match(about, /做有意思的事情/);
+});

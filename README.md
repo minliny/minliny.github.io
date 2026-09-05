@@ -19,9 +19,9 @@
 
 仓库当前实现位于 [blog-frontend](blog-frontend/)，核心流程是：
 
-1. 从 Notion 数据库读取 `Published` 文章并校验统一内容契约
+1. 从 Notion 数据库读取 `Published` 文章；作者只需填写名称和正文
 2. 将正文、内容寻址媒体和 `manifest.json` 原子写入 `.content/notion/`
-3. 在构建期把 Markdown 转成安全 HTML、索引、RSS、sitemap 和历史 Slug 重定向
+3. 在构建期把 Markdown 转成安全 HTML、索引、RSS 和 sitemap
 4. 把同一份经过校验的 `blog-frontend/dist/` 发布到主站服务器和 GitHub Pages
 
 ## 核心功能
@@ -33,7 +33,7 @@
 - Notion 图片和文件镜像到内容寻址的本地媒体目录
 - 生成文章索引 `posts.json`
 - 生成 RSS `feed.xml`
-- 生成 `content-manifest.json`、`sitemap.xml` 和历史 Slug 重定向
+- 生成 `content-manifest.json` 和 `sitemap.xml`
 - 构建产物包含 CSP、HTML 消毒、协议白名单和完整性校验
 - 通过 GitHub Actions 自动构建，并从同一快照部署主站服务器和 GitHub Pages
 - 支持本地静态预览
@@ -87,19 +87,12 @@
 
 ## Notion 发布方式
 
-日常发布只需要标题、正文和发布状态。其他字段都是可选覆盖：
+日常写作只需要填写名称和正文。文章模板会自动把状态设为 `Draft`；写完后把状态改为 `Published` 即可发布。
 
-| 字段名 | 类型 | 说明 |
-| --- | --- | --- |
-| 名称 | `title` | 必填；文章标题 |
-| Status | `select` | 必填；设为 `Published` 时发布 |
-| Slug | `rich_text` | 可选；留空时根据 Notion 页面 ID 生成稳定 URL |
-| Date | `date` | 可选；留空时使用 Notion 页面创建日期 |
-| Excerpt | `rich_text` | 可选；留空时由 AI 理解正文后重写摘要 |
-| Group | `select` | 可选；留空时使用 `notes` |
-| Tags | `multi_select` | 标签 |
-| Cover | `url` 或 `files` | 封面 |
-| Aliases | `multi_select` 或 `rich_text` | 历史 Slug（可选） |
+| 字段名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| 名称 | `title` | 空 | 作者填写的文章标题 |
+| Status | `select` | `Draft` | `Published` 时才发布 |
 
 ### Status 选项
 
@@ -108,14 +101,15 @@
 
 ### 发布规则
 
-- `Draft` 不发布
-- `Published` 才发布
-- Notion 正文作为博客正文来源
+- `Draft` 不发布，`Published` 才发布
+- 名称和页面正文是作者唯一需要填写的内容
+- 文章 URL 根据 Notion 页面 ID 稳定生成，修改标题不会改变地址
+- 创建时间读取 Notion `created_time`，更新时间读取 `last_edited_time`
+- 摘要自动从正文提取，不依赖 AI，也不需要 Notion 字段
+- Notion 不配置分类；分类由 Git 和构建层处理，缺失时统一使用站点默认分类 `notes`
 - 每 30 分钟自动检查一次 Notion 更新
-- 手工填写的 Slug、Date、Excerpt 和 Group 会优先于自动值
-- AI 摘要会写回 `Excerpt` 作为可编辑缓存；清空它即可要求重新生成
 
-更多字段说明见 [docs/notion-database.md](docs/notion-database.md)。
+完整配置说明见 [docs/notion-database.md](docs/notion-database.md)。
 
 ## 快速开始
 
@@ -181,13 +175,9 @@ npm run serve
 | `SITE_URL` | 否 | canonical 主域，用于 Open Graph、RSS、sitemap、manifest 和 robots；默认读取 `site.config.json` |
 | `ALLOW_EMPTY_NOTION_SYNC` | 否 | 设为 `1` 时允许数据库为空（默认拒绝空快照） |
 | `CONTENT_DIR` | 否 | Notion 快照目录，默认 `.content/notion` |
-| `AI_SUMMARY_TOKEN` | 否 | 本地智能摘要所需 Token；Actions 自动使用 `github.token` |
-| `AI_SUMMARY_MODEL` | 否 | 摘要模型，默认 `openai/gpt-4.1-mini` |
-| `AI_SUMMARY_WRITEBACK` | 否 | 设为 `1` 时把生成结果写回 Notion `Excerpt` |
 | `STRICT_UNSUPPORTED_BLOCKS` | 否 | 高级严格模式；默认不因个别未支持 Block 阻止发布 |
 | `NOTION_MEDIA_MAX_BYTES` | 否 | 单个媒体文件大小上限，默认 15 MiB |
 | `NOTION_MEDIA_TIMEOUT_MS` | 否 | 媒体下载超时，默认 20 秒 |
-| `NOTION_GROUP_ALLOWLIST` | 否 | 允许的 Group，默认 `tech,notes,life` |
 | `GITHUB_TOKEN` | 否 | 仅在你自定义 GitHub API 调用时使用，当前 Actions Pages 部署流程不直接读取该值 |
 
 ## 本地运行方式

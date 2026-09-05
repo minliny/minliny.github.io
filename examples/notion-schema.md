@@ -1,23 +1,19 @@
-# Notion Schema Example
+# Notion 最小配置示例
 
-| 字段名 | 类型 | 必填 | 示例值 | 用途 |
-| --- | --- | --- | --- | --- |
-| 名称 | `title` | 是 | 欢迎使用 MoZhu_Blog | 文章标题 |
-| Slug | `rich_text` | 是 | 2026-04-26-welcome-to-notion-blog | URL 和文件名 |
-| Status | `select` | 是 | Published | 控制是否发布 |
-| Date | `date` | 是 | 2026-04-26 | 发布时间 |
-| Excerpt | `rich_text` | 是 | 这是一篇示例文章。 | 首页摘要和 RSS 描述 |
-| Group | `select` | 是 | notes | 分组 |
-| Tags | `multi_select` | 否 | sample, getting-started | 标签 |
-| Cover | `url` | 否 | https://example.com/cover.png | 封面链接 |
+## 数据库字段
 
-## Status 选项
+| 字段名 | 类型 | 模板默认值 | 作者操作 |
+| --- | --- | --- | --- |
+| 名称 | `title` | 空 | 填写文章标题 |
+| Status | `select` | `Draft` | 写完后改为 `Published` |
 
-- `Draft`
-- `Published`
+正文直接写在 Notion 页面中。作者唯一必须填写的是名称和正文。
 
-## Group 选项
+## 默认文章模板
 
-- `tech`
-- `notes`
-- `life`
+创建一个“新文章”模板，并把它设为数据库默认模板：
+
+- Status：`Draft`
+- 正文：留空
+
+除此之外不需要添加其他字段。系统会根据页面 ID 生成稳定 URL，读取 Notion 的创建和更新时间，并从正文自动提取摘要。分类由 Git 和构建层处理，缺失时使用站点默认分类 `notes`。

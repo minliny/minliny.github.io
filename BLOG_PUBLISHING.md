@@ -2,13 +2,14 @@
 
 ## 日常更新
 
-1. 在 Notion 博客数据库中编辑标题、正文和其他字段。
-2. 需要上线的文章将 `Status` 设为 `Published`；暂不发布的文章保持 `Draft`。
-3. 保存后等待 `Deploy Blog` 工作流自动执行。定时任务在每小时的第 17、47 分钟检查一次，GitHub Actions 忙时可能延迟。
-4. 需要立即发布时，在 GitHub Actions 的 `Deploy Blog` 页面点击 **Run workflow**。
-5. 发布完成后检查主域 [blog.minliny.com](https://blog.minliny.com) 和 Pages 镜像 [minliny.github.io](https://minliny.github.io)。
+1. 使用 Notion 数据库的默认文章模板新建页面。模板会自动设置 `Status = Draft`。
+2. 填写名称和页面正文。这是日常写作唯一必须填写的内容。
+3. 写完后将 `Status` 改为 `Published`。保持 `Draft` 的页面不会发布。
+4. 保存后等待 `Deploy Blog` 工作流自动执行。定时任务在每小时的第 17、47 分钟检查一次，GitHub Actions 忙时可能延迟。
+5. 需要立即发布时，在 GitHub Actions 的 `Deploy Blog` 页面点击 **Run workflow**。
+6. 发布完成后检查主域 [blog.minliny.com](https://blog.minliny.com) 和 Pages 镜像 [minliny.github.io](https://minliny.github.io)。
 
-修改 Slug 前，先把旧 Slug 填入 `Aliases`，让旧链接继续跳转到新地址。删除或下线文章时，先改为 `Draft`，不要直接删除 Notion 页面。
+文章地址根据 Notion 页面 ID 自动生成，修改名称不会改变地址。创建时间和更新时间读取 Notion 的页面时间，摘要从正文自动提取，这些信息都不需要手工填写。Notion 不配置分类；分类由 Git 和构建层处理，未指定时统一归入站点默认分类 `notes`。删除或下线文章时，先改为 `Draft`，不要直接删除 Notion 页面。
 
 ## 自动发布链路
 
@@ -21,7 +22,6 @@ GitHub 仓库需要配置 Secrets `NOTION_TOKEN`、`NOTION_DATABASE_ID`、`BLOG_
 ## 回滚
 
 - 文章内容错误：在 Notion 恢复正确版本，或把文章改回 `Draft`，然后手动运行 `Deploy Blog`。
-- Slug 错误：恢复原 Slug，把已公开过的错误 Slug加入 `Aliases`，再运行工作流。
 - 代码错误：对错误提交执行 `git revert <commit>`，审查后推送到 `main`。不要强制改写 `main` 历史。
 - 需要取证或恢复旧产物时：从对应 Actions 运行下载 `site-snapshot-<commit>-<run>`；快照保留 90 天。当前工作流不会自动部署下载的旧快照，恢复前仍需人工核对其内容、SHA-256 和来源。
 

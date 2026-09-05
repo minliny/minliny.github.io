@@ -12,7 +12,6 @@ on:
 permissions:
   actions: read
   contents: read
-  models: read
 
 concurrency:
   group: pages-${{ github.repository }}
@@ -72,9 +71,6 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           CONTENT_DIR: .content/notion
-          AI_SUMMARY_TOKEN: ${{ github.token }}
-          AI_SUMMARY_MODEL: openai/gpt-4.1-mini
-          AI_SUMMARY_WRITEBACK: '1'
         run: npm run sync:notion
 
       - name: Test content and build code

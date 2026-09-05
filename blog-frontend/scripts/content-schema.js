@@ -1,14 +1,11 @@
 'use strict';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const DEFAULT_GROUP_ALLOWLIST = Object.freeze(['tech', 'notes', 'life']);
-const DEFAULT_GROUP = 'notes';
 
 const PROPERTY_SCHEMA = Object.freeze({
   '名称': Object.freeze({ required: true, types: Object.freeze(['title']) }),
   Slug: Object.freeze({ required: false, types: Object.freeze(['rich_text']) }),
   Status: Object.freeze({ required: true, types: Object.freeze(['select']) }),
-  Date: Object.freeze({ required: false, types: Object.freeze(['date']) }),
   Excerpt: Object.freeze({ required: false, types: Object.freeze(['rich_text']) }),
   Group: Object.freeze({ required: false, types: Object.freeze(['select']) }),
   Tags: Object.freeze({ required: false, types: Object.freeze(['multi_select']) }),
@@ -25,14 +22,6 @@ function maskId(value) {
 
 function getPlainText(richText) {
   return (richText || []).map((part) => part.plain_text || '').join('').trim();
-}
-
-function parseGroupAllowlist(value = process.env.NOTION_GROUP_ALLOWLIST) {
-  const configured = String(value || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return configured.length > 0 ? configured : [...DEFAULT_GROUP_ALLOWLIST];
 }
 
 function formatDate(value) {
@@ -59,16 +48,10 @@ function describeExpectedTypes(types) {
   return types.map((type) => `"${type}"`).join(' or ');
 }
 
-function validateDatabaseSchema(database, options = {}) {
-  const groupAllowlist = options.groupAllowlist || parseGroupAllowlist();
-  const allowedGroups = new Set(groupAllowlist);
+function validateDatabaseSchema(database) {
   const properties = database?.properties || {};
   const errors = [];
   const warnings = [];
-
-  if (allowedGroups.size === 0) {
-    errors.push('Group allowlist must contain at least one value.');
-  }
 
   Object.entries(PROPERTY_SCHEMA).forEach(([name, definition]) => {
     const property = properties[name];
@@ -86,23 +69,15 @@ function validateDatabaseSchema(database, options = {}) {
   const statusProperty = properties.Status;
   if (statusProperty?.type === 'select') {
     const statuses = new Set((statusProperty.select?.options || []).map((option) => option.name));
+    if (!statuses.has('Draft')) {
+      errors.push('Database property "Status" must define a "Draft" select option for the default authoring template.');
+    }
     if (!statuses.has('Published')) {
       errors.push('Database property "Status" must define a "Published" select option.');
     }
   }
 
-  const groupProperty = properties.Group;
-  if (groupProperty?.type === 'select') {
-    const configuredGroups = (groupProperty.select?.options || []).map((option) => option.name);
-    const outsideAllowlist = configuredGroups.filter((group) => !allowedGroups.has(group));
-    if (outsideAllowlist.length > 0) {
-      warnings.push(
-        `Database defines Group options outside the publish allowlist: ${outsideAllowlist.join(', ')}.`
-      );
-    }
-  }
-
-  return { errors, warnings, groupAllowlist: [...allowedGroups] };
+  return { errors, warnings };
 }
 
 function validatePropertyType(properties, name, definition, context, errors) {
@@ -168,9 +143,7 @@ function automaticSlug(pageId) {
   return compactId ? `post-${compactId.slice(0, 12)}` : '';
 }
 
-function extractPublishedPage(page, options = {}) {
-  const groupAllowlist = options.groupAllowlist || parseGroupAllowlist();
-  const allowedGroups = new Set(groupAllowlist);
+function extractPublishedPage(page) {
   const context = `Page ${maskId(page?.id)}`;
   const properties = page?.properties || {};
   const errors = [];
@@ -184,9 +157,9 @@ function extractPublishedPage(page, options = {}) {
   const configuredSlug = getPlainText(validProperties.Slug?.rich_text);
   const slug = configuredSlug || automaticSlug(page?.id);
   const status = validProperties.Status?.select?.name || '';
-  const rawDate = validProperties.Date?.date?.start || page?.created_time || '';
+  const rawDate = page?.created_time || '';
   const excerpt = getPlainText(validProperties.Excerpt?.rich_text);
-  const group = validProperties.Group?.select?.name || options.defaultGroup || DEFAULT_GROUP;
+  const group = String(validProperties.Group?.select?.name || '').trim();
   const tags = uniqueStrings((validProperties.Tags?.multi_select || []).map((item) => item.name));
   const aliases = uniqueStrings(extractAliases(validProperties.Aliases)).filter((alias) => alias !== slug);
   const updatedAt = String(page?.last_edited_time || '');
@@ -210,10 +183,6 @@ function extractPublishedPage(page, options = {}) {
       errors.push(`${context}: ${error.message}.`);
     }
   }
-  if (!allowedGroups.has(group)) {
-    errors.push(`${context}: Group "${group}" is not allowed (allowed: ${groupAllowlist.join(', ')}).`);
-  }
-
   aliases.forEach((alias) => {
     if (!SLUG_PATTERN.test(alias)) {
       errors.push(`${context}: invalid alias "${alias}"; use lowercase letters, numbers, and hyphens only.`);
@@ -239,13 +208,12 @@ function extractPublishedPage(page, options = {}) {
   return { article, errors };
 }
 
-function validatePublishedPages(pages, options = {}) {
-  const groupAllowlist = options.groupAllowlist || parseGroupAllowlist();
+function validatePublishedPages(pages) {
   const errors = [];
   const articles = [];
 
   (pages || []).forEach((page) => {
-    const result = extractPublishedPage(page, { groupAllowlist, defaultGroup: options.defaultGroup });
+    const result = extractPublishedPage(page);
     errors.push(...result.errors);
     articles.push(result.article);
   });
@@ -271,12 +239,10 @@ function validatePublishedPages(pages, options = {}) {
     }
   });
 
-  return { articles, errors, groupAllowlist };
+  return { articles, errors };
 }
 
 module.exports = {
-  DEFAULT_GROUP,
-  DEFAULT_GROUP_ALLOWLIST,
   PROPERTY_SCHEMA,
   SLUG_PATTERN,
   automaticSlug,
@@ -284,7 +250,6 @@ module.exports = {
   formatDate,
   getPlainText,
   maskId,
-  parseGroupAllowlist,
   validateDatabaseSchema,
   validatePublishedPages,
 };
