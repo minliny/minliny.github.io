@@ -99,6 +99,16 @@ function compareResource(left, right, label) {
   assert(left.sha256 === right.sha256, `${label} differs between canonical and mirror domains`);
 }
 
+function normalizeCloudflareEmailMarkers(value) {
+  return String(value).replace(/<!--\/?email_off-->/g, '');
+}
+
+function compareHtmlResource(left, right, label) {
+  const leftHash = sha256(Buffer.from(normalizeCloudflareEmailMarkers(left.text), 'utf8'));
+  const rightHash = sha256(Buffer.from(normalizeCloudflareEmailMarkers(right.text), 'utf8'));
+  assert(leftHash === rightHash, `${label} differs between canonical and mirror domains`);
+}
+
 async function loadDomain(baseUrl, canonicalUrl, options) {
   const resources = {};
   const entries = await Promise.all([
@@ -146,6 +156,7 @@ async function checkDeployment(options) {
     loadDomain(mirrorUrl, canonicalUrl, requestOptions),
   ]);
 
+  compareHtmlResource(canonical.resources.home, mirror.resources.home, 'home');
   for (const name of ['manifest', 'posts', 'feed', 'sitemap', 'style', 'javascript']) {
     compareResource(canonical.resources[name], mirror.resources[name], name);
   }
@@ -158,7 +169,7 @@ async function checkDeployment(options) {
   ]);
   assert(/^text\/html(?:\s*;|$)/i.test(canonicalArticle.contentType), `Canonical article has unexpected Content-Type: ${canonicalArticle.contentType || '(missing)'}`);
   assert(/^text\/html(?:\s*;|$)/i.test(mirrorArticle.contentType), `Mirror article has unexpected Content-Type: ${mirrorArticle.contentType || '(missing)'}`);
-  compareResource(canonicalArticle, mirrorArticle, 'representative article');
+  compareHtmlResource(canonicalArticle, mirrorArticle, 'representative article');
 
   return {
     articlePath,
@@ -212,6 +223,7 @@ module.exports = {
   checkDeployment,
   isJsonContentType,
   isXmlContentType,
+  normalizeCloudflareEmailMarkers,
   normalizeBaseUrl,
   positiveInteger,
 };

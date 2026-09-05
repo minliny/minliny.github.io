@@ -1,7 +1,12 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { checkDeployment, isJsonContentType, isXmlContentType } = require('./smoke-deployment');
+const {
+  checkDeployment,
+  isJsonContentType,
+  isXmlContentType,
+  normalizeCloudflareEmailMarkers,
+} = require('./smoke-deployment');
 
 function responseFor(body, contentType, url) {
   const response = new Response(body, {
@@ -63,4 +68,14 @@ test('content type checks accept structured JSON and XML media types', () => {
   assert.equal(isJsonContentType('text/plain'), false);
   assert.equal(isXmlContentType('application/rss+xml; charset=utf-8'), true);
   assert.equal(isXmlContentType('application/json'), false);
+});
+
+test('HTML comparison ignores only Cloudflare email_off control markers', () => {
+  const marked = '<!--email_off--><a href="mailto:writer@example.test">Email</a><!--/email_off-->';
+  const unmarked = '<a href="mailto:writer@example.test">Email</a>';
+  const transformed = '<a href="/cdn-cgi/l/email-protection">Email</a><script src="/cdn-cgi/email-decode.js"></script>';
+
+  assert.equal(normalizeCloudflareEmailMarkers(marked), unmarked);
+  assert.equal(normalizeCloudflareEmailMarkers(unmarked), unmarked);
+  assert.notEqual(normalizeCloudflareEmailMarkers(transformed), unmarked);
 });
