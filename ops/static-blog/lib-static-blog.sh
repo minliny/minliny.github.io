@@ -216,6 +216,38 @@ with tar:
 PY
 }
 
+normalize_static_tree_permissions() {
+  local release_dir="$1"
+
+  python3 - "$release_dir" <<'PY'
+import os
+import stat
+import sys
+
+release = sys.argv[1]
+
+def require_directory(path):
+    mode = os.lstat(path).st_mode
+    if not stat.S_ISDIR(mode):
+        raise SystemExit(f"release tree contains a non-directory entry where a directory is required: {path}")
+
+require_directory(release)
+for root, directories, files in os.walk(release, topdown=True, followlinks=False):
+    require_directory(root)
+    os.chmod(root, 0o755)
+    for name in directories:
+        path = os.path.join(root, name)
+        require_directory(path)
+        os.chmod(path, 0o755)
+    for name in files:
+        path = os.path.join(root, name)
+        mode = os.lstat(path).st_mode
+        if not stat.S_ISREG(mode):
+            raise SystemExit(f"release tree contains a link or special file: {path}")
+        os.chmod(path, 0o644)
+PY
+}
+
 write_deployment_json() {
   local destination="$1"
   local repo="$2"

@@ -291,15 +291,26 @@ env \
 [[ ! -e "$test_root/injected-releases" ]]
 [[ ! -e "$test_root/injected-current" ]]
 [[ ! -e "$test_root/injected.lock" ]]
-python3 - "$releases/${entry_commit}-${entry_run_id}/deployment.json" <<'PY'
+python3 - "$releases/${entry_commit}-${entry_run_id}" <<'PY'
 import os
 import stat
 import sys
 
-path = sys.argv[1]
-mode = stat.S_IMODE(os.stat(path, follow_symlinks=False).st_mode)
-if mode != 0o644:
-    raise SystemExit(f"deployment.json mode must be 0644 after forced-command deploy, got {mode:04o}")
+release = sys.argv[1]
+expected_modes = {
+    release: 0o755,
+    os.path.join(release, "posts"): 0o755,
+    os.path.join(release, "posts", "v1"): 0o755,
+    os.path.join(release, "deployment.json"): 0o644,
+    os.path.join(release, "index.html"): 0o644,
+    os.path.join(release, "posts", "v1", "index.html"): 0o644,
+}
+for path, expected in expected_modes.items():
+    mode = stat.S_IMODE(os.stat(path, follow_symlinks=False).st_mode)
+    if mode != expected:
+        raise SystemExit(
+            f"{path} mode must be {expected:04o} after forced-command deploy, got {mode:04o}"
+        )
 PY
 SSH_ORIGINAL_COMMAND="deploy $entry_commit $entry_run_id $sha_v1" \
   "$entrypoint" <"$archive_v1"
