@@ -9,7 +9,7 @@ const sanitizeHtml = require('sanitize-html');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CONFIG_PATH = path.join(ROOT_DIR, 'site.config.json');
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const REQUIRED_FIELDS = ['title', 'date', 'excerpt', 'group'];
+const REQUIRED_FIELDS = ['title', 'date', 'excerpt'];
 
 function parseArgs(argv) {
   const options = {};
@@ -103,13 +103,21 @@ function normalizeCover(value, title, filePath) {
   throw new Error(`Frontmatter "cover" must be a URL/path or { src, alt } in ${filePath}`);
 }
 
+function resolveDefaultGroup(config) {
+  const defaultGroup = String(config?.content?.defaultGroup || '').trim();
+  if (!defaultGroup) {
+    throw new Error('site.config.json content.defaultGroup must be a non-empty string');
+  }
+  return defaultGroup;
+}
+
 function loadArticles(contentDir, config) {
   const postsDir = path.join(contentDir, 'posts');
   if (!fs.existsSync(postsDir) || !fs.statSync(postsDir).isDirectory()) {
     throw new Error(`Content posts directory does not exist: ${postsDir}`);
   }
 
-  const allowedGroups = new Set(config.content.groups.map((group) => group.key));
+  const defaultGroup = resolveDefaultGroup(config);
   const files = fs.readdirSync(postsDir).filter((name) => name.endsWith('.md')).sort();
   if (files.length === 0) {
     throw new Error(`No Markdown articles found in ${postsDir}`);
@@ -130,10 +138,7 @@ function loadArticles(contentDir, config) {
 
     const title = String(parsed.data.title).trim();
     const excerpt = String(parsed.data.excerpt).trim();
-    const group = String(parsed.data.group).trim();
-    if (!allowedGroups.has(group)) {
-      throw new Error(`Unknown group "${group}" in ${filePath}`);
-    }
+    const group = String(parsed.data.group || '').trim() || defaultGroup;
     const date = normalizeDate(parsed.data.date, filePath);
     const aliases = normalizeStringArray(parsed.data.aliases, 'aliases', filePath);
     aliases.forEach((alias) => {
@@ -184,15 +189,30 @@ function loadArticles(contentDir, config) {
     }
   }
 
-  const aboutCount = articles.filter((article) => article.slug === config.content.aboutSlug).length;
-  if (aboutCount !== 1) {
-    throw new Error(`Expected exactly one "${config.content.aboutSlug}" article, found ${aboutCount}`);
-  }
-
   return articles.sort((left, right) => {
     const byDate = right.date.localeCompare(left.date);
     return byDate || left.slug.localeCompare(right.slug);
   });
+}
+
+function defaultAboutArticle(config) {
+  const title = `关于 ${config.site.title}`;
+  const body = config.site.description || config.site.tagline || config.site.title;
+  return {
+    notionId: 'system:about',
+    slug: config.content.aboutSlug,
+    aliases: [],
+    title,
+    excerpt: config.site.description || body,
+    group: resolveDefaultGroup(config),
+    tags: [],
+    date: '1970-01-01',
+    updatedAt: '1970-01-01T00:00:00.000Z',
+    cover: null,
+    body,
+    sourcePath: CONFIG_PATH,
+    contentHash: `sha256:${sha256(body)}`,
+  };
 }
 
 function safeContentUrl(rawValue, context) {
@@ -391,7 +411,16 @@ function copyFile(outputDir, relativePath) {
 
 function buildIndex({ articles, config, siteUrl, outputDir, assetVersion }) {
   const posts = articles.filter((article) => article.slug !== config.content.aboutSlug);
-  const sections = config.content.groups.map((group) => {
+  const configuredGroups = config.content.groups || [];
+  const configuredKeys = new Set(configuredGroups.map((group) => group.key));
+  const discoveredGroups = [...new Set(posts.map((article) => article.group))]
+    .filter((group) => group && !configuredKeys.has(group))
+    .sort((left, right) => left.localeCompare(right, config.site.language));
+  const groups = [
+    ...configuredGroups,
+    ...discoveredGroups.map((group) => ({ key: group, label: group })),
+  ];
+  const sections = groups.map((group) => {
     const items = posts.filter((article) => article.group === group.key);
     if (items.length === 0) return '';
     return `<section class="post-group">
@@ -613,6 +642,14 @@ function buildFeeds({ articles, config, siteUrl, outputDir }) {
     '</urlset>',
   ].join('\n');
   writeFile(outputDir, 'sitemap.xml', sitemap);
+
+  const robots = [
+    'User-agent: *',
+    'Allow: /',
+    '',
+    `Sitemap: ${absoluteUrl(siteUrl, 'sitemap.xml') || 'sitemap.xml'}`,
+  ].join('\n');
+  writeFile(outputDir, 'robots.txt', robots);
 }
 
 function copyMedia(contentDir, outputDir) {
@@ -668,7 +705,8 @@ function main() {
   }
   const siteUrl = normalizeSiteUrl(args['site-url'] || process.env.SITE_URL || config.site.publicUrl);
   const articles = loadArticles(contentDir, config);
-  const about = articles.find((article) => article.slug === config.content.aboutSlug);
+  const about = articles.find((article) => article.slug === config.content.aboutSlug)
+    || defaultAboutArticle(config);
   const assetFiles = [
     'style.css', 'theme.js', 'chrome/background.js', 'chrome/nav.js', 'chrome/init.js',
     'runtime/page.js', 'runtime/legacy.js',

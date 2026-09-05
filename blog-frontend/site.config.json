@@ -8,10 +8,11 @@
     "author": "Minliny",
     "email": "wsf430mike@gmail.com",
     "repository": "https://github.com/minliny/MoZhu_Blog",
-    "publicUrl": "https://minliny.github.io/MoZhu_Blog"
+    "publicUrl": "https://blog.minliny.com"
   },
   "content": {
     "aboutSlug": "about",
+    "defaultGroup": "notes",
     "groups": [
       { "key": "tech", "label": "Tech" },
       { "key": "notes", "label": "Notes" },

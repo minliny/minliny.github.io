@@ -7,7 +7,6 @@ const dotenv = require('dotenv');
 const { Client } = require('@notionhq/client');
 const {
   maskId,
-  parseGroupAllowlist,
   validateDatabaseSchema,
   validatePublishedPages,
 } = require('./content-schema');
@@ -19,10 +18,8 @@ const REQUIRED_ENV = ['NOTION_TOKEN', 'NOTION_DATABASE_ID'];
 const DRY_RUN = process.argv.includes('--dry-run');
 const ALLOW_EMPTY_SYNC = process.env.ALLOW_EMPTY_NOTION_SYNC === '1';
 const STRICT_UNSUPPORTED_BLOCKS = process.env.STRICT_UNSUPPORTED_BLOCKS === '1';
-const AI_SUMMARY_MODEL = process.env.AI_SUMMARY_MODEL || 'openai/gpt-4.1-mini';
-const AI_SUMMARY_WRITEBACK = process.env.AI_SUMMARY_WRITEBACK === '1';
-const AI_SUMMARY_ENDPOINT = 'https://models.github.ai/inference/chat/completions';
-const AI_SUMMARY_SOURCE_LIMIT = 12_000;
+const EXCERPT_MAX_LENGTH = 120;
+const EXCERPT_MIN_SENTENCE_LENGTH = 30;
 const MAX_MEDIA_BYTES = parsePositiveInteger(process.env.NOTION_MEDIA_MAX_BYTES, 15 * 1024 * 1024);
 const MEDIA_TIMEOUT_MS = parsePositiveInteger(process.env.NOTION_MEDIA_TIMEOUT_MS, 20_000);
 const LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
@@ -89,8 +86,9 @@ function serializeFrontmatter(article) {
     `title: ${yamlString(article.title)}`,
     `date: ${yamlString(article.date)}`,
     `excerpt: ${yamlString(article.excerpt)}`,
-    `group: ${yamlString(article.group)}`,
   ];
+  const legacyGroup = String(article.group || '').trim();
+  if (legacyGroup) lines.push(`group: ${yamlString(legacyGroup)}`);
   appendYamlArray(lines, 'tags', article.tags);
   lines.push(`cover: ${yamlString(article.cover || '')}`);
   appendYamlArray(lines, 'aliases', article.aliases);
@@ -201,7 +199,6 @@ async function fetchDatabasePages(client) {
       property: 'Status',
       select: { equals: 'Published' },
     },
-    sorts: [{ property: 'Date', direction: 'descending' }],
     start_cursor,
     page_size: 100,
   }));
@@ -303,84 +300,78 @@ function normalizeParagraph(text) {
   return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function normalizeGeneratedExcerpt(value) {
-  return String(value || '')
-    .replace(/^\s*(?:摘要|摘要内容|summary)\s*[:：]\s*/i, '')
-    .replace(/^\s*["“]|["”]\s*$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-async function generateSmartExcerpt(article, options = {}) {
-  const token = options.token || process.env.AI_SUMMARY_TOKEN || process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error('Excerpt is empty and AI_SUMMARY_TOKEN is unavailable; provide an Excerpt or enable AI summary generation.');
-  }
-
-  const fetchImpl = options.fetchImpl || fetch;
-  const model = options.model || AI_SUMMARY_MODEL;
-  const source = String(article.body || '').slice(0, AI_SUMMARY_SOURCE_LIMIT);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 30_000);
-  let response;
-  try {
-    response = await fetchImpl(options.endpoint || AI_SUMMARY_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2026-03-10',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: '你是中文个人博客的编辑。请对文章进行理解后重写摘要，不要直接复制开头或拼接原文句子。',
-          },
-          {
-            role: 'user',
-            content: [
-              `文章标题：${article.title}`,
-              '',
-              '文章正文：',
-              source,
-              '',
-              '请用与文章相同的语言生成 60–120 字的单段摘要，概括主题、关键方法或经验以及主要价值。不要使用 Markdown、引号、标题或“本文”之类的开场白，只输出摘要正文。',
-            ].join('\n'),
-          },
-        ],
-        temperature: 0.2,
-        max_tokens: 180,
-        seed: 430,
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    throw new Error(`AI summary request failed with HTTP ${response.status}`);
-  }
-  const payload = await response.json();
-  const excerpt = normalizeGeneratedExcerpt(payload.choices?.[0]?.message?.content);
-  if (Array.from(excerpt).length < 20) {
-    throw new Error('AI summary response was empty or too short');
-  }
-  return excerpt;
-}
-
-async function writeExcerptToNotion(client, pageId, excerpt) {
-  await client.pages.update({
-    page_id: pageId,
-    properties: {
-      Excerpt: {
-        rich_text: [{ type: 'text', text: { content: excerpt } }],
-      },
-    },
+function decodeHtmlEntities(value) {
+  const namedEntities = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+  return String(value || '').replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (match, entity) => {
+    if (entity[0] !== '#') return namedEntities[entity.toLowerCase()] ?? match;
+    const hexadecimal = entity[1]?.toLowerCase() === 'x';
+    const codePoint = Number.parseInt(entity.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+    if (!Number.isSafeInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return '';
+    try {
+      return String.fromCodePoint(codePoint);
+    } catch (_error) {
+      return '';
+    }
   });
+}
+
+function markdownToPlainText(value) {
+  let text = String(value || '')
+    .replace(/<!--[^]*?-->/g, ' ')
+    .replace(/^\s*(`{3,}|~{3,})[^\n]*\n[^]*?^\s*\1\s*$/gm, ' ')
+    .replace(/^\s*\$\$\s*$[^]*?^\s*\$\$\s*$/gm, ' ')
+    .replace(/^\s*#{1,6}\s+.*$/gm, ' ')
+    .replace(/!\[([^\]]*)\]\((?:<[^>]*>|[^)]*)\)/g, ' $1 ')
+    .replace(/\[([^\]]+)\]\((?:<[^>]*>|[^)]*)\)/g, ' $1 ')
+    .replace(/<https?:\/\/[^>]+>/gi, ' ')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/^\s*(?:[-*_]\s*){3,}$/gm, ' ')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*(?:[-+*]|\d+[.)])\s+/gm, '')
+    .replace(/^\s*\[[ xX]\]\s+/gm, '')
+    .replace(/(`+)([^]*?)\1/g, '$2')
+    .replace(/\\([\\`*_[\]{}()#+.!|>-])/g, '$1')
+    .replace(/[*_~]+/g, ' ');
+
+  text = decodeHtmlEntities(text)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[\t\r\n ]+/g, ' ')
+    .replace(/\s+([,.;:!?，。；：！？])/g, '$1')
+    .trim();
+  return text;
+}
+
+function truncateExcerpt(value, maxLength = EXCERPT_MAX_LENGTH) {
+  const characters = Array.from(String(value || '').trim());
+  if (characters.length <= maxLength) return characters.join('');
+
+  const candidate = characters.slice(0, maxLength).join('');
+  let sentenceEnd = -1;
+  for (const match of candidate.matchAll(/[。！？!?；;]/g)) {
+    if (match.index + 1 >= EXCERPT_MIN_SENTENCE_LENGTH) sentenceEnd = match.index + 1;
+  }
+  if (sentenceEnd > 0) return candidate.slice(0, sentenceEnd).trim();
+
+  const availableLength = Math.max(1, maxLength - 1);
+  let hardCut = characters.slice(0, availableLength).join('').trimEnd();
+  const finalSpace = hardCut.lastIndexOf(' ');
+  if (finalSpace >= EXCERPT_MIN_SENTENCE_LENGTH) hardCut = hardCut.slice(0, finalSpace).trimEnd();
+  return `${hardCut}…`;
+}
+
+function generateExcerptFromBody(body, options = {}) {
+  const plainText = markdownToPlainText(body);
+  const fallback = markdownToPlainText(options.fallback || '');
+  const source = plainText || fallback;
+  if (!source) throw new Error('article body does not contain text that can be used for an excerpt');
+  return truncateExcerpt(source, options.maxLength || EXCERPT_MAX_LENGTH);
 }
 
 function prefixLines(value, prefix) {
@@ -501,21 +492,8 @@ async function buildArticle(client, article, context) {
   ]);
   const body = (await renderChildren(blocks, context)).trim();
   if (!body) throw new Error('article body is empty');
-  let excerpt = article.excerpt;
-  if (!excerpt) {
-    excerpt = await context.generateSummary({ ...article, body });
-    context.summaryCount += 1;
-    if (context.writeSummary) {
-      try {
-        await context.writeSummary(article.notionId, excerpt);
-        context.summaryWritebackCount += 1;
-      } catch (error) {
-        context.summaryWritebackErrors.push(
-          `Page ${maskId(article.notionId)}: AI summary was generated but Excerpt writeback failed: ${error.message}`
-        );
-      }
-    }
-  }
+  const excerpt = article.excerpt || generateExcerptFromBody(body, { fallback: article.title });
+  if (!article.excerpt) context.generatedExcerptCount += 1;
   const normalizedArticle = {
     ...article,
     excerpt,
@@ -536,14 +514,7 @@ async function buildSnapshot(client, articles, options = {}) {
     mediaStore: createMediaStore(),
     unsupportedCounts: new Map(),
     unsafeUrlCounts: new Map(),
-    summaryCount: 0,
-    summaryWritebackCount: 0,
-    summaryWritebackErrors: [],
-    generateSummary: options.generateSummary || ((article) => generateSmartExcerpt(article)),
-    writeSummary: options.writeSummary
-      || (AI_SUMMARY_WRITEBACK && !DRY_RUN
-        ? (pageId, excerpt) => writeExcerptToNotion(client, pageId, excerpt)
-        : null),
+    generatedExcerptCount: 0,
   };
   const builtArticles = [];
   const errors = [];
@@ -655,15 +626,13 @@ function throwCollectedErrors(label, errors) {
 async function main() {
   ensureEnv();
   const contentDir = resolveContentDir();
-  const groupAllowlist = parseGroupAllowlist();
   console.log(`Starting stateless Notion snapshot${DRY_RUN ? ' (dry-run)' : ''}...`);
   console.log(`Content directory: ${contentDir}`);
-  console.log(`Group allowlist: ${groupAllowlist.join(', ')}`);
   console.log(`Strict unsupported blocks: ${STRICT_UNSUPPORTED_BLOCKS ? 'enabled' : 'disabled'}`);
 
   const client = new Client({ auth: process.env.NOTION_TOKEN });
   const database = await client.databases.retrieve({ database_id: process.env.NOTION_DATABASE_ID });
-  const databaseValidation = validateDatabaseSchema(database, { groupAllowlist });
+  const databaseValidation = validateDatabaseSchema(database);
   databaseValidation.warnings.forEach((warning) => console.warn(`Schema warning: ${warning}`));
   throwCollectedErrors('Database schema validation failed', databaseValidation.errors);
 
@@ -672,14 +641,12 @@ async function main() {
     throw new Error('No published Notion pages found. Set ALLOW_EMPTY_NOTION_SYNC=1 only for an intentional empty snapshot.');
   }
 
-  const pageValidation = validatePublishedPages(pages, { groupAllowlist });
+  const pageValidation = validatePublishedPages(pages);
   throwCollectedErrors('Published content validation failed', pageValidation.errors);
   console.log(`Published pages validated: ${pages.length}`);
 
   const snapshot = await buildSnapshot(client, pageValidation.articles);
-  console.log(`AI summaries generated: ${snapshot.summaryCount}`);
-  console.log(`AI summaries written back to Notion: ${snapshot.summaryWritebackCount}`);
-  snapshot.summaryWritebackErrors.forEach((warning) => console.warn(`Summary cache warning: ${warning}`));
+  console.log(`Excerpts generated from article bodies: ${snapshot.generatedExcerptCount}`);
   printCounterSummary('Unsupported block summary', snapshot.unsupportedCounts);
   printCounterSummary('Blocked URL summary', snapshot.unsafeUrlCounts);
   if (STRICT_UNSUPPORTED_BLOCKS && snapshot.unsupportedCounts.size > 0) {
@@ -709,10 +676,11 @@ module.exports = {
   buildArticle,
   buildSnapshot,
   createManifest,
+  fetchDatabasePages,
+  generateExcerptFromBody,
   downloadNotionImage,
   escapeMarkdownText,
-  generateSmartExcerpt,
-  normalizeGeneratedExcerpt,
+  markdownToPlainText,
   renderBlock,
   resolveContentDir,
   richTextToMarkdown,

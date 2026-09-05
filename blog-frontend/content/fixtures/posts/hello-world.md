@@ -3,7 +3,7 @@ notionId: fixture-hello-world
 title: Welcome to MoZhu_Blog
 date: 2026-04-25
 updatedAt: 2026-04-25T00:00:00.000Z
-excerpt: A sample post that shows the minimum frontmatter required by the static blog build pipeline.
+excerpt: A sample post used to exercise the static blog build pipeline.
 group: notes
 tags:
   - sample
@@ -18,7 +18,7 @@ This post exists so the project can be cloned, built, and previewed without requ
 
 ## What this post demonstrates
 
-- Required frontmatter fields
+- Generated fixture metadata consumed by the build pipeline
 - Build-time Markdown rendering
 - A clean `dist/` publishing boundary
 - Participation in `posts.json`, RSS, and the sitemap

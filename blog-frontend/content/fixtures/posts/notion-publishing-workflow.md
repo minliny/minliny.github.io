@@ -19,7 +19,7 @@ This sample article explains the repository workflow at a high level.
 ## Publishing flow
 
 1. Write content in Notion
-2. Fill in the required database fields
+2. Fill in the page title and body
 3. Mark the page as `Published`
 4. Generate a complete content snapshot
 5. Validate and deploy the generated `dist/`
@@ -28,7 +28,7 @@ This sample article explains the repository workflow at a high level.
 
 The reusable template includes public-safe fixtures so contributors can verify the UI and build output without access to a private Notion workspace.
 
-Production content is separate: fixtures never override a Notion article with the same Slug.
+Production content is separate: fixtures never override a Notion article with the same generated route.
 
 ## Notes
 
