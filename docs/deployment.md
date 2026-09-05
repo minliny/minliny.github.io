@@ -18,7 +18,7 @@
 2. 在 `blog-frontend/` 执行 `npm ci`
 3. 根据仓库名选择 Notion 或公开 fixtures 内容源
 4. Notion 模式生成 `.content/notion/` 无状态全量快照
-5. 空 Excerpt 通过 GitHub Models 生成摘要并写回 Notion 作为缓存
+5. 从正文自动提取摘要，并读取 Notion 的创建时间和更新时间
 6. 使用 `https://blog.minliny.com` 作为 `SITE_URL`，单次构建并校验 `blog-frontend/dist/`
 7. 保存精确命名的不可变快照，同时部署到 GitHub Pages
 8. 下载同一快照，打包并计算 SHA-256，通过受限 forced-command SSH 部署到主站服务器
@@ -41,7 +41,6 @@
 说明：
 
 - 当前 Pages 工作流固定使用 `https://blog.minliny.com` 作为 canonical `SITE_URL`。
-- GitHub Models 使用 Actions 自带的 `github.token` 和 `models: read`，不需要新增 API Key Secret。
 - 只有 `minliny.github.io` 仓库读取 Notion Secrets；模板仓库使用 `content/fixtures`。
 - 不要把真实 Token 写入代码库或提交到 `.env.example`。
 - `site.config.json` 中的 `repository` 保持为 `https://github.com/minliny/MoZhu_Blog`，它是开源入口，不参与 canonical 地址推导。

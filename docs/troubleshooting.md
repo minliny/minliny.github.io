@@ -28,28 +28,19 @@
 2. 确认至少有一篇文章的 `Status` 为 `Published`
 3. 如确实需要空库运行，可设置 `ALLOW_EMPTY_NOTION_SYNC=1`
 
-## `Invalid slug`（仅手工填写 Slug 时）
+## Published 文章没有生成
 
 原因：
 
-- `Slug` 中包含大写字母、空格、下划线或中文
+- 文章名称为空
+- 页面正文为空
+- `Status` 的值不是大小写完全一致的 `Published`
 
 处理：
 
-- 清空 Slug，让系统根据 Notion 页面 ID 自动生成；或
-- 使用仅包含小写字母、数字和连字符的自定义 Slug
-
-## `Slug conflict`
-
-原因：
-
-- 不同 Notion 页面使用了相同 `Slug` 或 `Aliases`
-- 某个历史 Alias 与当前文章 Slug 冲突
-
-处理：
-
-1. 回到 Notion 检查重复 slug
-2. 检查 `.content/notion/manifest.json` 中的 route 列表
+1. 填写文章名称和页面正文
+2. 发布时把 `Status` 改为 `Published`
+3. 文章地址由页面 ID 自动生成，无需填写地址字段
 
 ## GitHub Actions 部署失败
 
@@ -60,15 +51,16 @@
 - 仓库 Pages Source 是否设置为 GitHub Actions
 - `npm ci` 是否能正常安装依赖
 
-## `AI summary request failed`
+## 文章进入了默认分组
 
-原因通常是 GitHub Models 未对仓库启用，或 Actions token 没有 `models: read` 权限。
+原因：
+
+- 文章没有选择 `Group`
 
 处理：
 
-1. 在仓库 Settings 中启用 GitHub Models
-2. 确认工作流包含 `permissions: models: read`
-3. 如果需要立即发布，可先手工填写 `Excerpt`
+- 这是预期行为，未选择时使用 `notes`
+- 需要新分组时，直接在 Notion 的 `Group` 字段新增选项并选择；网站会在下一次发布后自动显示
 
 ## 本地预览看不到文章
 

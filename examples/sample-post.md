@@ -1,12 +1,5 @@
 ---
 title: 欢迎使用 MoZhu_Blog
-date: 2026-04-26
-excerpt: 这是一篇示例文章，用于展示 Markdown、分组、标签和静态构建效果。
-group: notes
-tags:
-  - sample
-  - getting-started
-cover: https://example.com/cover.png
 ---
 
 欢迎来到示例文章。
@@ -16,7 +9,8 @@ cover: https://example.com/cover.png
 ## 你可以怎么使用它
 
 - 在 Notion 中写作
-- 将文章状态设为 `Published`
+- 只填写名称和正文
+- 写完后将文章状态从 `Draft` 改为 `Published`
 - 运行同步脚本生成本地 Markdown
 - 构建 `posts.json` 和 `feed.xml`
 - 部署到 GitHub Pages

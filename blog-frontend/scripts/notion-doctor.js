@@ -6,7 +6,6 @@ const { Client } = require('@notionhq/client');
 const {
   PROPERTY_SCHEMA,
   maskId,
-  parseGroupAllowlist,
   validateDatabaseSchema,
   validatePublishedPages,
 } = require('./content-schema');
@@ -38,12 +37,10 @@ function printCollectedErrors(errors) {
 async function main() {
   const token = process.env.NOTION_TOKEN;
   const databaseId = process.env.NOTION_DATABASE_ID;
-  const groupAllowlist = parseGroupAllowlist();
 
   console.log('Notion doctor starting...');
   console.log(`NOTION_TOKEN: ${token ? '<set>' : '<missing>'}`);
   console.log(`NOTION_DATABASE_ID: ${maskId(databaseId)}`);
-  console.log(`Group allowlist: ${groupAllowlist.join(', ')}`);
 
   if (!token || !databaseId) {
     throw new Error('Missing NOTION_TOKEN or NOTION_DATABASE_ID.');
@@ -51,7 +48,7 @@ async function main() {
 
   const client = new Client({ auth: token });
   const database = await client.databases.retrieve({ database_id: databaseId });
-  const schemaValidation = validateDatabaseSchema(database, { groupAllowlist });
+  const schemaValidation = validateDatabaseSchema(database);
 
   console.log('Content schema:');
   Object.entries(PROPERTY_SCHEMA).forEach(([name, definition]) => {
@@ -79,7 +76,7 @@ async function main() {
   console.log(`Published pages: ${publishedPages.length}`);
   console.log(`Non-published pages: ${allPages.length - publishedPages.length}`);
 
-  const contentValidation = validatePublishedPages(publishedPages, { groupAllowlist });
+  const contentValidation = validatePublishedPages(publishedPages);
   const errors = [...schemaValidation.errors, ...contentValidation.errors];
   if (publishedPages.length === 0 && process.env.ALLOW_EMPTY_NOTION_SYNC !== '1') {
     errors.push('No published pages found; the production sync would refuse an empty snapshot.');

@@ -12,6 +12,7 @@
   },
   "content": {
     "aboutSlug": "about",
+    "defaultGroup": "notes",
     "groups": [
       { "key": "tech", "label": "Tech" },
       { "key": "notes", "label": "Notes" },
