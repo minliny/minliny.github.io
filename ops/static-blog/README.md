@@ -55,6 +55,12 @@ release. A failed HTTP check restores the previous symlink. Rollback follows the
 same checks and verifies its target before changing the symlink. No script
 deletes a completed release.
 
+Before activation, the deployer normalizes every staged release directory to
+mode `0755` and every static file to `0644`. These modes override the forced
+entrypoint's restrictive umask, so Nginx can traverse and read the immutable
+tree while no group or other user can modify it. Links and special files remain
+forbidden.
+
 Replaying the same `commit + runId` is safe when repository, site URL, artifact
 SHA-256, and the complete `deployment.json` identity match. The existing release
 is verified again and activated if necessary. Any identity or hash mismatch is

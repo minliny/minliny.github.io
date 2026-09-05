@@ -128,6 +128,7 @@ cp -a "$source_dir/." "$staging_release/"
 write_deployment_json \
   "$staging_release/deployment.json" \
   "$repo" "$commit" "$run_id" "$site_url" "$expected_sha256"
+normalize_static_tree_permissions "$staging_release"
 
 "$SCRIPT_DIR/verify-static-blog.sh" "$staging_release"
 mv -- "$staging_release" "$final_release"
