@@ -98,7 +98,7 @@ test('SITE_URL is consistent across discovery metadata and output validation', (
   assert.match(`${mismatch.stdout}\n${mismatch.stderr}`, /does not (?:use|match) SITE_URL/);
 });
 
-test('build adds arbitrary article groups and defaults missing groups to notes', (t) => {
+test('build preserves legacy groups and reads a missing group from site.config', (t) => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mozhu-groups-test-'));
   t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
   const contentDir = path.join(temporaryRoot, 'content');
@@ -139,11 +139,12 @@ Default body.
   assert.equal(build.status, 0, build.stderr || build.stdout);
   const home = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
   const posts = JSON.parse(fs.readFileSync(path.join(outputDir, 'posts.json'), 'utf8'));
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'site.config.json'), 'utf8'));
   assert.match(home, /<h2 class="group-title">研究札记<\/h2>/);
   assert.match(home, /href="posts\/research-note\/"/);
   assert.match(home, /href="posts\/default-note\/"/);
   assert.equal(posts.find((post) => post.slug === 'research-note').group, '研究札记');
-  assert.equal(posts.find((post) => post.slug === 'default-note').group, 'notes');
+  assert.equal(posts.find((post) => post.slug === 'default-note').group, config.content.defaultGroup);
 });
 
 test('build does not require a specially configured Notion about article', (t) => {

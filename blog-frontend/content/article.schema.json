@@ -19,7 +19,7 @@
     "title": { "type": "string", "minLength": 1 },
     "date": { "type": "string", "format": "date" },
     "excerpt": { "type": "string", "minLength": 1 },
-    "group": { "type": "string", "minLength": 1, "default": "notes" },
+    "group": { "type": "string", "minLength": 1 },
     "tags": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
     "cover": { "type": "string" },
     "aliases": {

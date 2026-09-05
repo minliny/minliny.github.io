@@ -86,8 +86,9 @@ function serializeFrontmatter(article) {
     `title: ${yamlString(article.title)}`,
     `date: ${yamlString(article.date)}`,
     `excerpt: ${yamlString(article.excerpt)}`,
-    `group: ${yamlString(article.group)}`,
   ];
+  const legacyGroup = String(article.group || '').trim();
+  if (legacyGroup) lines.push(`group: ${yamlString(legacyGroup)}`);
   appendYamlArray(lines, 'tags', article.tags);
   lines.push(`cover: ${yamlString(article.cover || '')}`);
   appendYamlArray(lines, 'aliases', article.aliases);

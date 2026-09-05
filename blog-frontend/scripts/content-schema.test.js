@@ -32,7 +32,6 @@ function databaseFixture() {
       Slug: { type: 'rich_text', rich_text: {} },
       Status: { type: 'select', select: { options: [{ name: 'Draft' }, { name: 'Published' }] } },
       Excerpt: { type: 'rich_text', rich_text: {} },
-      Group: { type: 'select', select: { options: [{ name: 'tech' }, { name: 'notes' }] } },
       Tags: { type: 'multi_select', multi_select: { options: [] } },
       Cover: { type: 'files', files: {} },
       Aliases: { type: 'multi_select', multi_select: { options: [] } },
@@ -48,7 +47,7 @@ function pageFixture(overrides = {}) {
   const id = overrides.id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const value = (name, fallback) => Object.hasOwn(overrides, name) ? overrides[name] : fallback;
   const slug = value('slug', 'safe-article');
-  return {
+  const page = {
     id,
     created_time: value('createdTime', '2026-07-18T08:00:00.000Z'),
     last_edited_time: value('lastEditedTime', '2026-07-19T08:00:00.000Z'),
@@ -59,7 +58,6 @@ function pageFixture(overrides = {}) {
       Status: { type: 'select', select: { name: overrides.status || 'Published' } },
       Date: { type: 'date', date: { start: value('date', '2026-07-19') } },
       Excerpt: { type: 'rich_text', rich_text: richText(value('excerpt', 'Summary')) },
-      Group: { type: 'select', select: { name: value('group', 'tech') } },
       Tags: { type: 'multi_select', multi_select: [{ name: 'node' }, { name: 'node' }] },
       Cover: { type: 'files', files: [] },
       Aliases: {
@@ -68,6 +66,13 @@ function pageFixture(overrides = {}) {
       },
     },
   };
+  if (Object.hasOwn(overrides, 'group')) {
+    page.properties.Group = {
+      type: 'select',
+      select: overrides.group === null ? null : { name: overrides.group },
+    };
+  }
+  return page;
 }
 
 test('database and published page use one shared schema contract', () => {
@@ -82,14 +87,14 @@ test('database and published page use one shared schema contract', () => {
   assert.deepEqual(pageResult.articles[0].tags, ['node']);
 });
 
-test('author metadata defaults to stable slug, created time, and notes group', () => {
+test('metadata without a Notion Group leaves classification to the Git build', () => {
   const minimalDatabase = databaseFixture();
   ['Slug', 'Excerpt', 'Group', 'Tags', 'Cover', 'Aliases'].forEach((name) => {
     delete minimalDatabase.properties[name];
   });
   assert.deepEqual(validateDatabaseSchema(minimalDatabase).errors, []);
 
-  const page = pageFixture({ slug: '', date: 'not-a-date', excerpt: '', group: '' });
+  const page = pageFixture({ slug: '', date: 'not-a-date', excerpt: '' });
   ['Slug', 'Date', 'Excerpt', 'Group', 'Tags', 'Cover', 'Aliases'].forEach((name) => {
     delete page.properties[name];
   });
@@ -98,11 +103,12 @@ test('author metadata defaults to stable slug, created time, and notes group', (
   assert.equal(result.articles[0].slug, automaticSlug(page.id));
   assert.equal(result.articles[0].date, '2026-07-18');
   assert.equal(result.articles[0].excerpt, '');
-  assert.equal(result.articles[0].group, 'notes');
+  assert.equal(result.articles[0].group, '');
+  assert.doesNotMatch(serializeFrontmatter(result.articles[0]), /^group:/m);
 });
 
 test('a published page needs only a name and non-empty body', async () => {
-  const page = pageFixture({ slug: '', excerpt: '', group: '' });
+  const page = pageFixture({ slug: '', excerpt: '' });
   ['Slug', 'Date', 'Excerpt', 'Group', 'Tags', 'Cover', 'Aliases'].forEach((name) => {
     delete page.properties[name];
   });
@@ -130,8 +136,9 @@ test('a published page needs only a name and non-empty body', async () => {
   assert.equal(snapshot.articles[0].slug, automaticSlug(page.id));
   assert.equal(snapshot.articles[0].date, '2026-07-18');
   assert.equal(snapshot.articles[0].updatedAt, '2026-07-19T08:00:00.000Z');
-  assert.equal(snapshot.articles[0].group, 'notes');
+  assert.equal(snapshot.articles[0].group, '');
   assert.equal(snapshot.articles[0].excerpt, '只填写正文也能生成完整文章。');
+  assert.doesNotMatch(snapshot.articles[0].markdown, /^group:/m);
 });
 
 test('Draft and Published status options are required by the authoring template', () => {
@@ -157,15 +164,21 @@ test('published query does not depend on a Date database property', async () => 
   assert.equal(Object.hasOwn(receivedQuery, 'sorts'), false);
 });
 
-test('any non-empty Notion group is accepted without an allowlist', () => {
+test('a legacy Notion Group select is read without requiring configured options', () => {
   const database = databaseFixture();
-  database.properties.Group.select.options.push({ name: '研究札记' });
+  database.properties.Group = { type: 'select', select: { options: [] } };
   assert.deepEqual(validateDatabaseSchema(database).errors, []);
   assert.deepEqual(validateDatabaseSchema(database).warnings, []);
 
   const result = validatePublishedPages([pageFixture({ group: '研究札记' })]);
   assert.deepEqual(result.errors, []);
   assert.equal(result.articles[0].group, '研究札记');
+  assert.match(serializeFrontmatter(result.articles[0]), /^group: "研究札记"$/m);
+
+  const emptyResult = validatePublishedPages([pageFixture({ group: null })]);
+  assert.deepEqual(emptyResult.errors, []);
+  assert.equal(emptyResult.articles[0].group, '');
+  assert.doesNotMatch(serializeFrontmatter(emptyResult.articles[0]), /^group:/m);
 });
 
 test('empty Excerpt is derived deterministically from plain article text', () => {

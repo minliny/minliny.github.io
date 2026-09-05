@@ -21,7 +21,7 @@
 
 1. 从 Notion 数据库读取 `Published` 文章；作者只需填写名称和正文
 2. 将正文、内容寻址媒体和 `manifest.json` 原子写入 `.content/notion/`
-3. 在构建期把 Markdown 转成安全 HTML、索引、RSS、sitemap 和历史 Slug 重定向
+3. 在构建期把 Markdown 转成安全 HTML、索引、RSS 和 sitemap
 4. 把同一份经过校验的 `blog-frontend/dist/` 发布到主站服务器和 GitHub Pages
 
 ## 核心功能
@@ -87,13 +87,12 @@
 
 ## Notion 发布方式
 
-日常写作只需要填写名称和正文。文章模板会自动把状态设为 `Draft`、分组设为 `notes`；写完后把状态改为 `Published` 即可发布。
+日常写作只需要填写名称和正文。文章模板会自动把状态设为 `Draft`；写完后把状态改为 `Published` 即可发布。
 
 | 字段名 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | 名称 | `title` | 空 | 作者填写的文章标题 |
 | Status | `select` | `Draft` | `Published` 时才发布 |
-| Group | `select` | `notes` | 文章分组；可在 Notion 中新增选项 |
 
 ### Status 选项
 
@@ -107,10 +106,10 @@
 - 文章 URL 根据 Notion 页面 ID 稳定生成，修改标题不会改变地址
 - 创建时间读取 Notion `created_time`，更新时间读取 `last_edited_time`
 - 摘要自动从正文提取，不依赖 AI，也不需要 Notion 字段
-- 未选择分组时使用 `notes`；在 Notion 新增分组选项后，网站会自动显示新分组
+- Notion 不配置分类；分类由 Git 和构建层处理，缺失时统一使用站点默认分类 `notes`
 - 每 30 分钟自动检查一次 Notion 更新
 
-更多字段说明见 [docs/notion-database.md](docs/notion-database.md)。
+完整配置说明见 [docs/notion-database.md](docs/notion-database.md)。
 
 ## 快速开始
 

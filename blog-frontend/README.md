@@ -4,9 +4,9 @@
 
 ## Notion 写作约定
 
-Notion 数据库只需配置 `名称`、`Status` 和 `Group` 三个属性。默认文章模板把 `Status` 设为 `Draft`、`Group` 设为 `notes`。作者填写名称和页面正文，完成后把状态改为 `Published`。
+Notion 数据库只需配置 `名称` 和 `Status` 两个属性。默认文章模板把 `Status` 设为 `Draft`。作者填写名称和页面正文，完成后把状态改为 `Published`。
 
-文章 URL、创建时间、更新时间和摘要由同步程序根据页面 ID、Notion 系统时间和正文自动生成。新增 `Group` 选项会随下一次发布自动出现在网站中。
+文章 URL、创建时间、更新时间和摘要由同步程序根据页面 ID、Notion 系统时间和正文自动生成。分类不在 Notion 中配置，由 Git 和构建层处理；缺失时使用站点默认分类 `notes`。
 
 ## 常用命令
 

@@ -1,7 +1,6 @@
 'use strict';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const DEFAULT_GROUP = 'notes';
 
 const PROPERTY_SCHEMA = Object.freeze({
   '名称': Object.freeze({ required: true, types: Object.freeze(['title']) }),
@@ -144,7 +143,7 @@ function automaticSlug(pageId) {
   return compactId ? `post-${compactId.slice(0, 12)}` : '';
 }
 
-function extractPublishedPage(page, options = {}) {
+function extractPublishedPage(page) {
   const context = `Page ${maskId(page?.id)}`;
   const properties = page?.properties || {};
   const errors = [];
@@ -160,9 +159,7 @@ function extractPublishedPage(page, options = {}) {
   const status = validProperties.Status?.select?.name || '';
   const rawDate = page?.created_time || '';
   const excerpt = getPlainText(validProperties.Excerpt?.rich_text);
-  const group = String(validProperties.Group?.select?.name || '').trim()
-    || options.defaultGroup
-    || DEFAULT_GROUP;
+  const group = String(validProperties.Group?.select?.name || '').trim();
   const tags = uniqueStrings((validProperties.Tags?.multi_select || []).map((item) => item.name));
   const aliases = uniqueStrings(extractAliases(validProperties.Aliases)).filter((alias) => alias !== slug);
   const updatedAt = String(page?.last_edited_time || '');
@@ -211,12 +208,12 @@ function extractPublishedPage(page, options = {}) {
   return { article, errors };
 }
 
-function validatePublishedPages(pages, options = {}) {
+function validatePublishedPages(pages) {
   const errors = [];
   const articles = [];
 
   (pages || []).forEach((page) => {
-    const result = extractPublishedPage(page, { defaultGroup: options.defaultGroup });
+    const result = extractPublishedPage(page);
     errors.push(...result.errors);
     articles.push(result.article);
   });
@@ -246,7 +243,6 @@ function validatePublishedPages(pages, options = {}) {
 }
 
 module.exports = {
-  DEFAULT_GROUP,
   PROPERTY_SCHEMA,
   SLUG_PATTERN,
   automaticSlug,

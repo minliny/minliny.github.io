@@ -103,12 +103,21 @@ function normalizeCover(value, title, filePath) {
   throw new Error(`Frontmatter "cover" must be a URL/path or { src, alt } in ${filePath}`);
 }
 
+function resolveDefaultGroup(config) {
+  const defaultGroup = String(config?.content?.defaultGroup || '').trim();
+  if (!defaultGroup) {
+    throw new Error('site.config.json content.defaultGroup must be a non-empty string');
+  }
+  return defaultGroup;
+}
+
 function loadArticles(contentDir, config) {
   const postsDir = path.join(contentDir, 'posts');
   if (!fs.existsSync(postsDir) || !fs.statSync(postsDir).isDirectory()) {
     throw new Error(`Content posts directory does not exist: ${postsDir}`);
   }
 
+  const defaultGroup = resolveDefaultGroup(config);
   const files = fs.readdirSync(postsDir).filter((name) => name.endsWith('.md')).sort();
   if (files.length === 0) {
     throw new Error(`No Markdown articles found in ${postsDir}`);
@@ -129,7 +138,7 @@ function loadArticles(contentDir, config) {
 
     const title = String(parsed.data.title).trim();
     const excerpt = String(parsed.data.excerpt).trim();
-    const group = String(parsed.data.group || config.content.defaultGroup || 'notes').trim() || 'notes';
+    const group = String(parsed.data.group || '').trim() || defaultGroup;
     const date = normalizeDate(parsed.data.date, filePath);
     const aliases = normalizeStringArray(parsed.data.aliases, 'aliases', filePath);
     aliases.forEach((alias) => {
@@ -195,7 +204,7 @@ function defaultAboutArticle(config) {
     aliases: [],
     title,
     excerpt: config.site.description || body,
-    group: config.content.defaultGroup || 'notes',
+    group: resolveDefaultGroup(config),
     tags: [],
     date: '1970-01-01',
     updatedAt: '1970-01-01T00:00:00.000Z',
