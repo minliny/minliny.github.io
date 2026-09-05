@@ -76,6 +76,7 @@ test('SITE_URL is consistent across discovery metadata and output validation', (
   assert.match(home, /<meta property="og:url" content="https:\/\/canonical\.example\.test\/blog\/">/);
   assert.match(article, /<link rel="canonical" href="https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/">/);
   assert.match(article, /<meta property="og:url" content="https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/">/);
+  assert.match(article, /<!--email_off--><a href="mailto:wsf430mike@gmail\.com">邮箱<\/a><!--\/email_off-->/);
   assert.match(feed, /<link>https:\/\/canonical\.example\.test\/blog\/<\/link>/);
   assert.match(feed, /<guid>https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/<\/guid>/);
   assert.match(sitemap, /<loc>https:\/\/canonical\.example\.test\/blog\/posts\/hello-world\/<\/loc>/);

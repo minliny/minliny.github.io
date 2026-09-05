@@ -390,7 +390,7 @@ function footer(config, rootPrefix) {
     <div class="footer-label">Connect</div>
     <div class="links-connect">
       <a href="${rootPrefix}feed.xml">RSS</a>
-      <a href="mailto:${escapeHtml(config.site.email)}">邮箱</a>
+      <!--email_off--><a href="mailto:${escapeHtml(config.site.email)}">邮箱</a><!--/email_off-->
       <a href="${rootPrefix}about.html">关于</a>
     </div>
   </footer>`;
