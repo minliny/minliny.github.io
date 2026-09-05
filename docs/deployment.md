@@ -47,6 +47,28 @@
 - `site.config.json` 中的 `repository` 保持为 `https://github.com/minliny/MoZhu_Blog`，它是开源入口，不参与 canonical 地址推导。
 - 部署公钥必须由服务器绑定受限 forced command，只接收 `deploy <commit> <run_id> <sha256>`；不要把私钥或 known_hosts 内容提交到仓库。
 
+## 主站服务器发布器
+
+受限发布器的完整源码和自测位于 [`ops/static-blog/`](../ops/static-blog/README.md)。服务器将这些文件安装在 `/opt/scripts/static-blog/`，部署账号只接收构建产物，不在服务器运行 Node.js，也不接触 Notion Token。
+
+服务器还需要加载 [`nginx-health.conf`](../ops/static-blog/nginx-health.conf) 中的回环监听。它只绑定 `127.0.0.1:8080` 并只提供五个发布校验文件；原子切换后，发布器逐文件比较 HTTP 响应和 release 文件的 SHA-256。公网 HTTPS 由工作流的双域 smoke 独立验证。
+
+上线前在服务器执行：
+
+```bash
+cd /opt/scripts/static-blog
+./test-static-blog-release.sh
+sudo nginx -t
+```
+
+`authorized_keys` 必须把专用 Actions 公钥绑定到绝对路径，并关闭 SSH 侧通道：
+
+```text
+restrict,command="/opt/scripts/static-blog/github-blog-deploy-entrypoint.sh" ssh-ed25519 AAAA... github-actions:minliny/minliny.github.io
+```
+
+发布器固定仓库、域名、目录和资源上限，忽略 SSH 客户端提供的同名环境变量。每个 release 以 `commit-runId` 命名，完成后不会自动删除，以便人工回滚。
+
 ## GitHub Pages 设置建议
 
 1. 打开仓库 `Settings`
