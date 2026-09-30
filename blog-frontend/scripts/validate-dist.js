@@ -1,21 +1,18 @@
 const fs = require('fs');
 const path = require('path');
+const { safeTree, sha256, MAX_SITE_BYTES, validatePublicationIdentity } = require('./publish-fingerprint');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CONFIG_PATH = path.join(ROOT_DIR, 'site.config.json');
 
-function parseOutput(argv) {
-  if (argv.length === 0) return process.env.DIST_DIR || 'dist';
-  if (argv.length === 2 && argv[0] === '--output') return argv[1];
-  throw new Error('Usage: node scripts/validate-dist.js [--output <directory>]');
-}
-
-function walkFiles(directory, root = directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory()) return walkFiles(absolute, root);
-    return [path.relative(root, absolute).split(path.sep).join('/')];
-  });
+function parseOptions(argv) {
+  const options = { output: process.env.DIST_DIR || 'dist', production: process.env.BLOG_PRODUCTION === '1' };
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === '--production') options.production = true;
+    else if (argv[index] === '--output' && argv[index + 1] && !argv[index + 1].startsWith('--')) options.output = argv[++index];
+    else throw new Error('Usage: node scripts/validate-dist.js [--output <directory>] [--production]');
+  }
+  return options;
 }
 
 function assert(condition, message, errors) {
@@ -65,7 +62,8 @@ function existsAsPage(target) {
 }
 
 function main() {
-  const outputArg = parseOutput(process.argv.slice(2));
+  const options = parseOptions(process.argv.slice(2));
+  const outputArg = options.output;
   const outputDir = path.isAbsolute(outputArg) ? outputArg : path.resolve(ROOT_DIR, outputArg);
   const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
   const siteUrl = normalizeSiteUrl(process.env.SITE_URL || config.site.publicUrl);
@@ -74,7 +72,9 @@ function main() {
     throw new Error(`Output directory does not exist: ${outputDir}`);
   }
 
-  const files = walkFiles(outputDir).sort();
+  const tree = safeTree(outputDir, { maxBytes: MAX_SITE_BYTES });
+  const files = tree.files.map((file) => file.path).sort();
+  if (tree.bytes >= 750 * 1024 * 1024) console.warn('Site size warning: ' + tree.bytes + ' bytes; publish limit is ' + MAX_SITE_BYTES);
   const fileSet = new Set(files);
   const required = [
     'index.html', 'about.html', 'post.html', '404.html', 'feed.xml', 'sitemap.xml', 'robots.txt',
@@ -89,6 +89,10 @@ function main() {
     /(^|\/)package(?:-lock)?\.json$/,
     /(^|\/)scripts\//,
     /\.md$/,
+    /(^|\/)\.git(?:\/|$)/,
+    /(^|\/)\.content(?:\/|$)/,
+    /\.(?:pem|key|p12|pfx|keystore)$/i,
+    /(^|\/)(?:publish-identity|release-manifest|SHA256SUMS)(?:\.json)?$/,
   ];
   files.forEach((name) => {
     forbiddenPatterns.forEach((pattern) => {
@@ -142,6 +146,14 @@ function main() {
     assert(manifest.siteUrl === siteUrl, `Manifest siteUrl does not match SITE_URL: ${manifest.siteUrl}`, errors);
     assert(manifest.articleCount === posts.length, 'Manifest articleCount does not match posts.json', errors);
     assert(['fixtures', 'notion'].includes(manifest.source), `Unknown manifest source: ${manifest.source}`, errors);
+    if (options.production || manifest.fingerprintVersion !== undefined) {
+      try { validatePublicationIdentity(manifest, { siteUrl }); } catch (error) { errors.push(error.message); }
+      assert(manifest.source === 'notion', 'Production manifest source must be notion', errors);
+      assert(manifest.articleCount > 0, 'Production output must contain published articles', errors);
+      assert(fileSet.has('.nojekyll'), 'Production output must include .nojekyll', errors);
+      assert(/^sha256:[a-f0-9]{64}$/.test(manifest.buildHash), 'Invalid production buildHash', errors);
+      assert(/^sha256:[a-f0-9]{64}$/.test(manifest.sourceManifestHash), 'Invalid production sourceManifestHash', errors);
+    }
 
     const slugs = new Set();
     const expectedHome = `${siteUrl}/`;
@@ -192,6 +204,8 @@ function main() {
   const mediaFiles = files.filter((name) => name.startsWith('media/'));
   mediaFiles.forEach((name) => {
     assert(/^media\/[a-f0-9]{64}\.[a-z0-9]+$/i.test(name), `Media is not content-addressed: ${name}`, errors);
+    const expected = name.split('/').at(-1).split('.')[0];
+    assert(sha256(fs.readFileSync(path.join(outputDir, name))) === expected, 'Media hash mismatch: ' + name, errors);
   });
 
   if (errors.length > 0) {

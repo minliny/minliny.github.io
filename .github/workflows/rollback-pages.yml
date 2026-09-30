@@ -1,0 +1,94 @@
+name: Rollback Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact archived site tag
+        type: string
+        required: true
+      expected_archive_sha256:
+        description: Independently recorded archive SHA-256 (64 hexadecimal characters)
+        type: string
+        required: true
+      note:
+        description: Recovery reason
+        type: string
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: blog-pages-production-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  SITE_URL: https://blog.minliny.com
+  BLOG_PUBLISH_PAUSED: ${{ vars.BLOG_PUBLISH_PAUSED }}
+  BLOG_SMOKE_BASE_URL: ${{ vars.BLOG_SMOKE_BASE_URL }}
+  BLOG_GITHUB_ENTRY_URL: https://minliny.github.io
+
+jobs:
+  rollback:
+    if: github.repository == 'minliny/minliny.github.io' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: blog-frontend
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      EXPECTED_SHA: ${{ inputs.expected_archive_sha256 }}
+    steps:
+      - name: Checkout current trusted recovery tools
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: blog-frontend/package-lock.json
+      - name: Install verifier dependencies
+        run: npm ci
+      - name: Require paused, disabled and drained normal publication
+        run: |
+          [[ "$RELEASE_TAG" =~ ^site-([0-9]+-[0-9]+|baseline-20260930-[0-9]+)$ ]]
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{64}$ ]]
+          node scripts/pages-publication.js guard --mode rollback
+      - name: Download exact archived site
+        run: gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/site-release" --pattern site.tar.gz --pattern release-manifest.json --pattern SHA256SUMS
+      - name: Verify and safely restore original bytes
+        run: |
+          legacy_args=()
+          if [[ "$RELEASE_TAG" =~ ^site-baseline-20260930-[0-9]+$ ]]; then legacy_args+=(--allow-legacy-baseline); fi
+          node scripts/verify-pages-release.js --release "$RUNNER_TEMP/site-release" --out dist --repo "$GITHUB_REPOSITORY" --site-url "$SITE_URL" --tag "$RELEASE_TAG" --expected-sha "$EXPECTED_SHA" "${legacy_args[@]}"
+      - name: Upload restored Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: blog-frontend/dist
+          retention-days: 1
+          include-hidden-files: true
+      - name: Recheck recovery gate before activation
+        run: node scripts/pages-publication.js guard --mode rollback
+      - name: Restore exact archived version
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - name: Verify restored site; keep automatic publication paused
+        env:
+          SMOKE_ATTEMPTS: '15'
+          SMOKE_DELAY_MS: '12000'
+          SMOKE_REQUEST_TIMEOUT_MS: '10000'
+        run: |
+          node scripts/smoke-deployment.js --base-url "$BLOG_SMOKE_BASE_URL" --site-url "$SITE_URL" --release-manifest "$RUNNER_TEMP/site-release/release-manifest.json"
+          echo "Restored and externally verified $RELEASE_TAG. Normal publication remains paused and disabled." >> "$GITHUB_STEP_SUMMARY"

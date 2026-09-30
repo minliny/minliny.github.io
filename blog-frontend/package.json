@@ -13,7 +13,11 @@
     "validate": "node scripts/validate-dist.js",
     "test": "node --test",
     "check": "npm test && npm run build:fixtures && npm run validate",
-    "serve": "python3 -m http.server 4321 --directory dist"
+    "serve": "python3 -m http.server 4321 --directory dist",
+    "fingerprint": "node scripts/publish-fingerprint.js",
+    "package:pages": "node scripts/package-pages-release.js",
+    "verify:pages": "node scripts/verify-pages-release.js",
+    "smoke:pages": "node scripts/smoke-deployment.js"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",

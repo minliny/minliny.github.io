@@ -1,10 +1,12 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('node:child_process');
 const matter = require('gray-matter');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
 const sanitizeHtml = require('sanitize-html');
+const { computeContentFingerprint, computeGeneratorFingerprint, validatePublicationIdentity } = require('./publish-fingerprint');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CONFIG_PATH = path.join(ROOT_DIR, 'site.config.json');
@@ -15,7 +17,7 @@ function parseArgs(argv) {
   const options = {};
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    if (!['--content', '--output', '--site-url'].includes(flag)) {
+    if (!['--content', '--output', '--site-url', '--identity'].includes(flag)) {
       throw new Error(`Unknown build option: ${flag}`);
     }
     const value = argv[index + 1];
@@ -704,6 +706,19 @@ function main() {
     throw new Error(`Refusing unsafe output directory: ${outputDir}`);
   }
   const siteUrl = normalizeSiteUrl(args['site-url'] || process.env.SITE_URL || config.site.publicUrl);
+  const identityPath = args.identity || process.env.PUBLISH_IDENTITY_FILE;
+  let publicationIdentity = null;
+  if (identityPath) {
+    publicationIdentity = validatePublicationIdentity(readJson(resolveFromRoot(identityPath)), { siteUrl });
+    const checkedOutCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT_DIR, encoding: 'utf8' }).trim();
+    if (publicationIdentity.sourceCommit !== checkedOutCommit) throw new Error('Publication sourceCommit is not the checked-out HEAD');
+    if (publicationIdentity.contentFingerprint !== computeContentFingerprint(contentDir)) throw new Error('Publication content fingerprint is stale');
+    const generator = computeGeneratorFingerprint();
+    if (publicationIdentity.generatorFingerprint !== generator.generatorFingerprint) throw new Error('Publication generator fingerprint is stale');
+    if (JSON.stringify(publicationIdentity.buildEnvironment) !== JSON.stringify(generator.buildEnvironment)) throw new Error('Publication build environment is stale');
+  } else if (process.env.BLOG_PRODUCTION === '1') {
+    throw new Error('Production build requires --identity or PUBLISH_IDENTITY_FILE');
+  }
   const articles = loadArticles(contentDir, config);
   const about = articles.find((article) => article.slug === config.content.aboutSlug)
     || defaultAboutArticle(config);
@@ -781,6 +796,7 @@ function main() {
       builtAt: deterministicBuildTime,
       siteUrl,
       buildHash,
+      ...(publicationIdentity || {}),
       articleCount: posts.length,
       mediaCount: copiedMedia.length,
       referencedMedia: [...referencedMedia].sort(),
