@@ -22,7 +22,7 @@
 1. 从 Notion 数据库读取 `Published` 文章；作者只需填写名称和正文
 2. 将正文、内容寻址媒体和 `manifest.json` 原子写入 `.content/notion/`
 3. 在构建期把 Markdown 转成安全 HTML、索引、RSS 和 sitemap
-4. 把同一份经过校验的 `blog-frontend/dist/` 发布到主站服务器和 GitHub Pages
+4. 有变化时把经过校验的 `blog-frontend/dist/` 归档到 GitHub Releases，再发布到 GitHub Pages
 
 ## 核心功能
 
@@ -35,7 +35,8 @@
 - 生成 RSS `feed.xml`
 - 生成 `content-manifest.json` 和 `sitemap.xml`
 - 构建产物包含 CSP、HTML 消毒、协议白名单和完整性校验
-- 通过 GitHub Actions 自动构建，并从同一快照部署主站服务器和 GitHub Pages
+- 通过 GitHub Actions 检查内容和生成器指纹，无变化时检查线上版本，有变化时构建并发布到 GitHub Pages
+- 每次发布保存独立 GitHub Release，支持不重新同步 Notion、不重建源码的精确回滚
 - 支持本地静态预览
 
 ## 设计说明
@@ -54,14 +55,14 @@
 - 内容来源改为以 Notion 数据库为发布后台
 - 通过 Node.js 脚本将 Notion 页面同步为本地 Markdown
 - 额外生成 `posts.json` 和 `feed.xml` 作为静态分发产物
-- 使用 GitHub Actions 自动构建，并发布到主站服务器和 GitHub Pages
+- 使用 GitHub Actions 自动检查并发布到 GitHub Pages
 - 仓库结构、同步逻辑、发布链路和开源文档均按模板项目场景重新整理
 
 如果你打算基于本项目继续定制，建议把站点文案、品牌名、配色、页眉页脚信息和示例文章替换为你自己的版本。
 
 ## 技术栈
 
-- Node.js 20+
+- Node.js 24（与生产 workflow 保持一致）
 - 原生 HTML / CSS / JavaScript
 - [@notionhq/client](https://www.npmjs.com/package/@notionhq/client)
 - [gray-matter](https://www.npmjs.com/package/gray-matter)
@@ -74,6 +75,7 @@
 ```text
 .
 ├── .github/workflows/deploy-blog.yml
+├── .github/workflows/rollback-pages.yml
 ├── blog-frontend/
 │   ├── content/fixtures/       # 模板预览内容，不是生产源
 │   ├── scripts/sync-notion.js  # 生成 .content/notion 全量快照
@@ -117,7 +119,7 @@
 
 ```bash
 cd blog-frontend
-npm install
+npm ci
 ```
 
 ### 2. 配置环境变量
@@ -178,7 +180,7 @@ npm run serve
 | `STRICT_UNSUPPORTED_BLOCKS` | 否 | 高级严格模式；默认不因个别未支持 Block 阻止发布 |
 | `NOTION_MEDIA_MAX_BYTES` | 否 | 单个媒体文件大小上限，默认 15 MiB |
 | `NOTION_MEDIA_TIMEOUT_MS` | 否 | 媒体下载超时，默认 20 秒 |
-| `GITHUB_TOKEN` | 否 | 仅在你自定义 GitHub API 调用时使用，当前 Actions Pages 部署流程不直接读取该值 |
+| `GITHUB_TOKEN` | 否 | Actions 内置 token，用于按 job 权限访问 Releases 和部署 Pages；无需新增长期 PAT，不写进 `.env` 或归档 |
 
 ## 本地运行方式
 
@@ -203,38 +205,36 @@ npm run sync:notion:dry
 
 当前仓库已经包含 GitHub Actions 工作流 [deploy-blog.yml](.github/workflows/deploy-blog.yml)。
 
-真实逻辑如下：
+生产入口只接受公开仓库 `minliny/minliny.github.io` 的 `main`；模板仓库只检查 fixtures，不读取生产 Notion 凭据或部署站点。发布逻辑如下：
 
-1. `minliny.github.io` 仓库从 Notion 生成生产快照；模板仓库使用 `content/fixtures`
+1. 从 Notion 全量同步 `Published` 内容，保持空快照保护
 2. 每 30 分钟检查一次，也支持 `workflow_dispatch` 和 `repository_dispatch`（`notion_publish`）
-3. 执行测试、单次构建和主域 URL 一致性校验
-4. 上传 `blog-frontend/dist/`，同时保留带 Commit SHA 的 90 天快照
-5. 从同一快照部署 Pages 和主站服务器，两边成功后检查双域首页与 `content-manifest.json`
+3. 比较内容、生成器及 canonical 指纹；无变化仍按可信 Release 检查线上文件
+4. 新的或未验证生成器必须通过代码测试；实际变化或手动 `force=true` 时单次构建并校验，上传 1 天 Pages 传输 artifact
+5. 用同一产物创建 `site-<run_id>-<run_attempt>` Release，核验归档后部署 Pages，并按这个 Release 的预期身份和逐文件 hash 检查站点
 
 需要在 GitHub 仓库 Secrets 中配置：
 
 - `NOTION_TOKEN`
 - `NOTION_DATABASE_ID`
-- `BLOG_DEPLOY_SSH_KEY`
 
-还需要配置仓库 Variables `BLOG_SSH_HOST`、`BLOG_SSH_USER` 和 `BLOG_SSH_KNOWN_HOSTS`。详情见 [BLOG_PUBLISHING.md](BLOG_PUBLISHING.md)。
+还需明确配置仓库 Variables `BLOG_PUBLISH_PAUSED=true/false` 与 `BLOG_SMOKE_BASE_URL`。暂停值缺失或非法时拒绝生产激活；`force` 不能绕过暂停。验收地址在切域前为 `https://minliny.github.io`，切域后为 `https://blog.minliny.com`；构建的 `SITE_URL` 始终是正式主域。详情见 [BLOG_PUBLISHING.md](BLOG_PUBLISHING.md)。
 
-当前站点地址：
+正式站点与 Pages 入口：
 
 - 主域：[https://blog.minliny.com](https://blog.minliny.com)
-- Pages 镜像：[https://minliny.github.io](https://minliny.github.io)
+- Pages 地址：[https://minliny.github.io](https://minliny.github.io)，配置自定义域后作为同一站点入口，可能重定向到主域
 
-日常更新和回滚步骤见 [BLOG_PUBLISHING.md](BLOG_PUBLISHING.md)。
+归档只包含通过 Published 门禁的静态产物。Release 在 Pages 激活前公开，候选文章可能提前通过归档下载；文章下线不自动抹除历史 Release。日常更新、撤稿和精确回滚步骤见 [BLOG_PUBLISHING.md](BLOG_PUBLISHING.md)。
 
 ## 部署方式
 
-当前真实已实现部署方式：
+仓库默认发布方式：
 
-- GitHub Pages：已实现
-- GitHub Actions 自动部署：已实现
-- 主站服务器部署：工作流已实现，启用前需配置受限 forced command、Secrets 和 Variables
-- Vercel：待配置
-- Netlify：待配置
+- GitHub Pages 提供全部静态站点托管，GitHub Actions 负责同步、构建与发布，GitHub Releases 保存恢复产物
+- 服务器恢复工具保留在 `ops/static-blog/`，正常发布不再调用 SSH
+- 域名、HTTPS、正式发布验收和服务器退出是实际切换步骤；代码存在不能证明这些步骤已完成
+- 切换验收后观察至少 7 天，再退出 Blog 专用服务；旧服务器产物至少备份 30 天，其他服务不在退出范围
 
 详细说明见 [docs/deployment.md](docs/deployment.md)。
 

@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Publish even when the verified fingerprint is unchanged
+        type: boolean
+        default: false
   repository_dispatch:
     types: [notion_publish]
   schedule:
@@ -14,176 +19,160 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.repository }}
+  group: blog-pages-production-${{ github.repository }}
   cancel-in-progress: false
+
+env:
+  SITE_URL: https://blog.minliny.com
+  ALLOW_EMPTY_NOTION_SYNC: '0'
+  BLOG_PUBLISH_PAUSED: ${{ vars.BLOG_PUBLISH_PAUSED }}
+  BLOG_SMOKE_BASE_URL: ${{ vars.BLOG_SMOKE_BASE_URL }}
+  BLOG_GITHUB_ENTRY_URL: https://minliny.github.io
 
 jobs:
   build:
-    if: github.event_name != 'schedule' || github.event.repository.name == format('{0}.github.io', github.repository_owner)
+    if: github.repository == 'minliny/minliny.github.io' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: blog-frontend
-    env:
-      ALLOW_EMPTY_NOTION_SYNC: '0'
-      SITE_URL: https://blog.minliny.com
-
+    outputs:
+      changed: ${{ steps.prepare.outputs.changed }}
+      source_commit: ${{ steps.identity.outputs.source_commit }}
+      release_tag: ${{ steps.identity.outputs.release_tag }}
+      publish_fingerprint: ${{ steps.identity.outputs.publish_fingerprint }}
+      build_hash: ${{ steps.build.outputs.build_hash }}
     steps:
-      - name: Checkout
+      - name: Require explicit publication state
+        working-directory: .
+        run: |
+          test "$BLOG_PUBLISH_PAUSED" = false
+          case "$BLOG_SMOKE_BASE_URL" in https://minliny.github.io|https://blog.minliny.com) ;; *) exit 1;; esac
+      - name: Checkout current production source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
+        with:
+          ref: main
+          persist-credentials: false
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: blog-frontend/package-lock.json
-
-      - name: Setup Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Select content source
-        id: content
-        shell: bash
-        run: |
-          if [ "$GITHUB_REPOSITORY" = "${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY_OWNER}.github.io" ]; then
-            echo "mode=notion" >> "$GITHUB_OUTPUT"
-            echo "directory=.content/notion" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=fixtures" >> "$GITHUB_OUTPUT"
-            echo "directory=content/fixtures" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Diagnose Notion connection
-        if: steps.content.outputs.mode == 'notion'
-        env:
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-        run: npm run doctor:notion
-
-      - name: Sync Notion snapshot
-        if: steps.content.outputs.mode == 'notion'
+      - name: Sync published Notion snapshot
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           CONTENT_DIR: .content/notion
         run: npm run sync:notion
-
-      - name: Test content and build code
+      - name: Calculate stable publication identity
+        id: identity
+        run: |
+          source_commit="$(git rev-parse HEAD)"
+          release_tag="site-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          node scripts/publish-fingerprint.js --content .content/notion --site-url "$SITE_URL" --repository "$GITHUB_REPOSITORY" --commit "$source_commit" --release-tag "$release_tag" --output "$RUNNER_TEMP/publish-identity.json"
+          echo "source_commit=$source_commit" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/publish-identity.json"));fs.appendFileSync(process.env.GITHUB_OUTPUT,"publish_fingerprint="+p.publishFingerprint+"\n")'
+      - name: Verify current release and decide whether to publish
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force || false }}
+          SMOKE_ATTEMPTS: '2'
+          SMOKE_DELAY_MS: '2000'
+        run: node scripts/pages-publication.js prepare --identity "$RUNNER_TEMP/publish-identity.json" --out "$RUNNER_TEMP/publish-decision.json" --force "$FORCE"
+      - name: Test new or unverified generator
+        if: steps.prepare.outputs.needs_tests == 'true'
         run: npm test
-
-      - name: Build site once
-        run: node scripts/build-site.js --content "${{ steps.content.outputs.directory }}" --site-url "$SITE_URL"
-
-      - name: Validate publish artifact
-        run: npm run validate
-
-      - name: Upload immutable site snapshot
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: site-snapshot-${{ github.sha }}-${{ github.run_id }}
-          path: blog-frontend/dist
-          include-hidden-files: true
-          retention-days: 90
-          if-no-files-found: error
-
-      - name: Upload Pages artifact
+      - name: Build changed production snapshot
+        id: build
+        if: steps.prepare.outputs.changed == 'true'
+        run: |
+          node scripts/build-site.js --content .content/notion --site-url "$SITE_URL" --identity "$RUNNER_TEMP/publish-identity.json"
+          node scripts/validate-dist.js --production
+          node -e 'const fs=require("fs");const m=JSON.parse(fs.readFileSync("dist/content-manifest.json"));fs.appendFileSync(process.env.GITHUB_OUTPUT,"build_hash="+m.buildHash+"\n")'
+      - name: Upload exact Pages transport artifact
+        if: steps.prepare.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: blog-frontend/dist
+          retention-days: 1
+          include-hidden-files: true
 
-  deploy:
+  publish:
     needs: build
+    if: needs.build.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
+      actions: read
+      contents: write
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    outputs:
-      page_url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      EXPECTED_FINGERPRINT: ${{ needs.build.outputs.publish_fingerprint }}
+      EXPECTED_BUILD_HASH: ${{ needs.build.outputs.build_hash }}
+    defaults:
+      run:
+        working-directory: blog-frontend
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
-
-  server_deploy:
-    name: Deploy canonical server
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Download exact site snapshot
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: site-snapshot-${{ github.sha }}-${{ github.run_id }}
-          path: release/site
-
-      - name: Package and stream release to forced-command SSH
-        shell: bash
-        env:
-          BLOG_DEPLOY_SSH_KEY: ${{ secrets.BLOG_DEPLOY_SSH_KEY }}
-          BLOG_SSH_KNOWN_HOSTS: ${{ vars.BLOG_SSH_KNOWN_HOSTS }}
-          BLOG_SSH_HOST: ${{ vars.BLOG_SSH_HOST }}
-          BLOG_SSH_USER: ${{ vars.BLOG_SSH_USER }}
-        run: |
-          set -euo pipefail
-          : "${BLOG_DEPLOY_SSH_KEY:?BLOG_DEPLOY_SSH_KEY is required}"
-          : "${BLOG_SSH_KNOWN_HOSTS:?BLOG_SSH_KNOWN_HOSTS is required}"
-          : "${BLOG_SSH_HOST:?BLOG_SSH_HOST is required}"
-          : "${BLOG_SSH_USER:?BLOG_SSH_USER is required}"
-          [[ "$BLOG_SSH_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "BLOG_SSH_HOST has an invalid format" >&2; exit 1; }
-          [[ "$BLOG_SSH_USER" =~ ^[A-Za-z_][A-Za-z0-9._-]*$ ]] || { echo "BLOG_SSH_USER has an invalid format" >&2; exit 1; }
-
-          archive_path="$RUNNER_TEMP/blog-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
-          key_path="$RUNNER_TEMP/blog-deploy-key"
-          known_hosts_path="$RUNNER_TEMP/blog-known-hosts"
-          trap 'rm -f "$archive_path" "$key_path" "$known_hosts_path"' EXIT
-
-          tar --create --gzip --file "$archive_path" --directory release/site .
-          archive_sha256="$(sha256sum "$archive_path" | awk '{ print $1 }')"
-          printf '%s\n' "$BLOG_DEPLOY_SSH_KEY" > "$key_path"
-          printf '%s\n' "$BLOG_SSH_KNOWN_HOSTS" > "$known_hosts_path"
-          chmod 600 "$key_path" "$known_hosts_path"
-
-          cat "$archive_path" | ssh \
-            -i "$key_path" \
-            -o BatchMode=yes \
-            -o ConnectTimeout=15 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$known_hosts_path" \
-            "${BLOG_SSH_USER}@${BLOG_SSH_HOST}" \
-            "deploy $GITHUB_SHA $GITHUB_RUN_ID $archive_sha256"
-
-  smoke:
-    needs: [deploy, server_deploy]
-    if: needs.deploy.result == 'success' && needs.server_deploy.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout smoke checker
+      - name: Checkout exact trusted verifier source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
+        with:
+          ref: ${{ needs.build.outputs.source_commit }}
+          persist-credentials: false
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
-
-      - name: Check canonical domain and Pages mirror
+          cache: npm
+          cache-dependency-path: blog-frontend/package-lock.json
+      - name: Install verifier dependencies
+        run: npm ci
+      - name: Download this run's exact Pages artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/pages-transport
+      - name: Safely unpack and bind artifact to build outputs
+        run: |
+          node scripts/verify-pages-release.js --pages-artifact "$RUNNER_TEMP/pages-transport/artifact.tar" --out dist
+          node -e 'const fs=require("fs");const m=JSON.parse(fs.readFileSync("dist/content-manifest.json"));for(const [key,value] of Object.entries({sourceRepository:process.env.GITHUB_REPOSITORY,sourceCommit:process.env.SOURCE_COMMIT,releaseTag:process.env.RELEASE_TAG,publishFingerprint:process.env.EXPECTED_FINGERPRINT,buildHash:process.env.EXPECTED_BUILD_HASH})){if(m[key]!==value)throw Error("Artifact identity mismatch: "+key)}'
+          node scripts/validate-dist.js --production
+      - name: Check main and publication gate before archiving
+        id: archive_gate
+        run: node scripts/pages-publication.js guard --commit "$SOURCE_COMMIT"
+      - name: Archive and independently verify exact website bytes
+        if: steps.archive_gate.outputs.activate == 'true'
+        run: |
+          node scripts/package-pages-release.js --dist dist --out "$RUNNER_TEMP/site-release" --repo "$GITHUB_REPOSITORY" --commit "$SOURCE_COMMIT" --tag "$RELEASE_TAG" --site-url "$SITE_URL"
+          archive_sha="$(node -p 'JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP+"/site-release/release-manifest.json")).archive.sha256')"
+          node scripts/verify-pages-release.js --release "$RUNNER_TEMP/site-release" --out "$RUNNER_TEMP/verified-site" --repo "$GITHUB_REPOSITORY" --site-url "$SITE_URL" --tag "$RELEASE_TAG" --expected-sha "$archive_sha"
+          node scripts/pages-publication.js archive --release "$RUNNER_TEMP/site-release"
+      - name: Recheck gate immediately before Pages activation
+        id: activate_gate
+        if: steps.archive_gate.outputs.activate == 'true'
+        run: node scripts/pages-publication.js guard --commit "$SOURCE_COMMIT"
+      - name: Activate the same Pages artifact
+        id: deployment
+        if: steps.activate_gate.outputs.activate == 'true'
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - name: Verify public site against this exact archive
+        if: steps.deployment.outcome == 'success'
         env:
-          CANONICAL_URL: https://blog.minliny.com
-          MIRROR_URL: https://minliny.github.io
           SMOKE_ATTEMPTS: '15'
           SMOKE_DELAY_MS: '12000'
           SMOKE_REQUEST_TIMEOUT_MS: '10000'
-        run: node blog-frontend/scripts/smoke-deployment.js
+        run: |
+          node scripts/smoke-deployment.js --base-url "$BLOG_SMOKE_BASE_URL" --site-url "$SITE_URL" --release-manifest "$RUNNER_TEMP/site-release/release-manifest.json"
+          echo "Pages activated and externally verified: $RELEASE_TAG ($SOURCE_COMMIT)." >> "$GITHUB_STEP_SUMMARY"

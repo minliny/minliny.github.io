@@ -11,13 +11,16 @@ Notion 数据库只需配置 `名称` 和 `Status` 两个属性。默认文章�
 ## 常用命令
 
 ```bash
-npm install
+npm ci
 npm run sync:notion
 npm run sync:notion:dry
+npm run build:notion
 npm run build:fixtures
 npm run validate
 npm run serve
 ```
+
+生产使用 Node.js 24 和 `build:notion`。`build` 默认构建公开 fixtures，模板检查不发布生产站点。dry-run 不写 `.content/notion`，需实际同步后再构建最新内容。发布、稳定指纹、Release 归档和精确回滚见 [发布说明](../BLOG_PUBLISHING.md)；正常托管由 GitHub Pages 提供，服务器恢复工具保留在 `ops/static-blog/`。
 
 ## 环境变量
 
